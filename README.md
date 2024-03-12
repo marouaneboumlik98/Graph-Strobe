@@ -88,7 +88,7 @@ Next is the initialization of the `MinimizerSeeder` object, defined in `src/Mini
     - b) k-mer are computed via bit shift, mask and bitwise OR
     - b) same hash function
 
-NOTE: there is a #IFDEF for osx (clang) defning an alterntive `hash()` in `CommonUtils.h`  
+NOTE: there is a #IFDEF for osx (clang) defining an alternative `hash()` in `CommonUtils.h`  
 
 ## Seeds from a loaded file
 
