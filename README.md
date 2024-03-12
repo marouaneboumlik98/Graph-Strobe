@@ -1,89 +1,133 @@
-# GraphAligner
+# Comments on GraphAligner code
 
-Seed-and-extend program for aligning long error-prone reads to genome graphs. To cite, see https://genomebiology.biomedcentral.com/articles/10.1186/s13059-020-02157-2. For a description of the bitvector alignment extension algorithm, see https://academic.oup.com/bioinformatics/advance-article/doi/10.1093/bioinformatics/btz162/5372677
+This branch contains information related to the indexation and associated data structures in GraphAligner.
+It aims to evaluate how feasible mer scheme replacement can be done in GraphAligner (GA) pipeline.
 
-### Installation
+## Sources overview
 
-Install via [bioconda](https://bioconda.github.io/):
+### dependencies
 
-- Install miniconda https://conda.io/projects/conda/en/latest/user-guide/install/index.html
-- `conda install -c bioconda graphaligner`
+GA depends on 4 GIT submodules: 
+- BBHash: BBHash is a simple library for building minimal perfect hash function. It is designed to handle large scale datasets. The function is just a little bit larger than other state-of-the-art libraries, it takes approximately 3 bits / elements (compared to 2.62 bits/elem for the emphf lib), but construction is faster and does not require additional memory.
+- MEMfinder: from the same author, no documentation. Searches for MEMs (minimal exact matches). I can see it is based on a FM-index (BWT & wavelet tree).
+- concurrentqueue: from the author: "An industrial-strength lock-free queue for C++, knock-your-socks-off blazing fast performance." See its repo for more.
+- parallel-hashmap: A repository aiming to provide a set of excellent hash map implementations, as well as a btree alternative to std::map and std::set. 
+- zstr: Enables the use of C++ standard iostreams to access ZLib-compressed streams.
 
-#### Compilation
+To pull them: `git submodule pull` after cloning this repository
 
-Bioconda is the recommended installation method. If you however want to compile GraphAligner yourself, run these:
+### Important source files:
 
-- Install miniconda https://conda.io/projects/conda/en/latest/user-guide/install/index.html
-- `git clone https://github.com/maickrau/GraphAligner.git`
-- `cd GraphAligner`
-- `git submodule update --init --recursive`
-- `conda env create -f CondaEnvironment_linux.yml` or `conda env create -f CondaEnvironment_osx.yml`
-- `source activate GraphAligner`
-- `make bin/GraphAligner`
+- `src/AlignerMain.cpp`: 
+    - contains the `main()`
+    - setup execution parameters which are registered in variable `AlignerParams params`.
+    - then call `alignReads(params)` from `src/Aligner.h`
+  - `src/Aligner.cpp`:
+    - `void alignReads()` : does the top operation: seeds creation or loading via index, then multithreaded alignment + output writing.
 
-Note that miniconda is only required during compilation and not during runtime. After compilation you can run the binary without the miniconda environment or copy the binary elsewhere.
+## Seeds computations
 
-If you want to compile without miniconda, you will need to install [boost](https://www.boost.org/), [protobuf and protoc](https://developers.google.com/protocol-buffers), [sdsl](https://github.com/simongog/sdsl-lite), [jemalloc](https://github.com/jemalloc/jemalloc) and [sparsehash](https://github.com/sparsehash/sparsehash).
+  1. `alignReads()` in `src/Aligner.cpp` does the job. 
+    2. Next block is the seed creation step:
+      ```C++
+        MEMSeeder* memseeder = nullptr;
+        auto alignmentGraph = getGraph(params.graphFile, &memseeder, params);
+        ## ignore for now
+        DiploidHeuristicSplitter diploidHeuristic;
+        if (params.useDiploidHeuristic) { [...] }
+        bool loadMinimizerSeeder = params.minimizerSeedDensity != 0;
+        MinimizerSeeder* minimizerseeder = nullptr;
+        if (loadMinimizerSeeder)
+        {
+              std::cout << "Build minimizer seeder from the graph" << std::endl;
+              minimizerseeder = new MinimizerSeeder(alignmentGraph, params.minimizerLength, params.minimizerWindowSize, params.numThreads, 1.0 - params.minimizerDiscardMostNumerousFraction);
+        }
+      ```
+      - MEMs are created from the graph each time even is minimizers are called for ?
+      - NO! It depends on parameters and the format of the graph to load, everything is tested in getGraph().
+    3. `getGraph()` will look for `.vg` or `.gfa` in the input graph filename.
+      - VG & MEMs: instanciate the MEMSeeder and calls for `DirectedGraph::BuildFromVG()`
+      - VG & !MEMs: calls for `DirectedGraph::StreamVGGraphFromFile()`
+      - GFA: calls for `DirectedGraph::BuildFromGFA(graph)` (and MEMSeeder if requested)  
+         - The structure to model the graph is `class DirectedGraph`, from `src/BigraphToDigraph.h`
+         - It does not model VG/GFA paths !
+         - If path are desired, just adding a definition there is enough
+           But VG loading functions will need to be extended.
+           It requires to load batches of node/edges which need to be merged to build the full graph.
+           This is similar to what I tested with the python API, see my code there if necessary.
+    4. This loads a Bigraph using the temporary struct defined in `src/BigraphToDigraph.h`.
+       Next is a conversion to get a Digraph, functions for conversion are in the same file.
+       The results is an object `AlignmentGraph`, the graph structure used in the algorithms.
+    5. Back to seed creation step. We have now a `AlignmentGraph alignmentGraph` (and maybe MEMSeeder intialized).
+       Next is the initialization of the `MinimizerSeeder` object, defined in `src/MinimizerSeeder.h`.
+       - happens only if no seed file loaded.
+       - skipping the part related to multithreading
+       - for 1 thread, the main loop is: 
+         ```C++
+           while (true)
+               {
+                 std::string sequence = graph.BigraphNodeSeq(nodeId);
+                 iterateMinimizers(sequence, minimizerLength, windowSize, [this, &nodeMinimizerStart, &positionDistributor, &kmerPerBucket, &positionPerBucket, &vecPos, positionSize, thread, nodeId](size_t pos, size_t kmer)
+                 {
+                   #computes minimizers for each window
+                 });
+               }
+         ```
+       - we expected it, as paths are not loaded. Minimizers are computed per node sequence.
+       - `iterateMinimizers()` is a callback either to a) `iterateMinimizersSimple()` or b) `iterateMinimizersReal()`. 
+         - a) k-mer are computed using `charToInt()` definitions and one bit left shift.
+         - a) hash is done via `hash()`, defined in `MinimizerSeeder.cpp` 
+         - a) NOTE: there is a IFDEF for osx hash() in `CommonUtils.h`  
+         - b) k-mer are computed via bit shift, mask and bitwise OR
+         - b) same hash function
 
-### Running
+## Seeds from a loaded file
 
-Quickstart: `GraphAligner -g test/graph.gfa -f test/read.fa -a test/aln.gaf -x vg`
+These variables appear to contain seeds loaded from a file (not computed):
+```C++
+const std::unordered_map<std::string, std::vector<SeedHit>>* seedHitsToThreads = nullptr;
+std::unordered_map<std::string, std::vector<SeedHit>> seedHits;
+```
 
-See [Parameters](#parameters), the option `GraphAligner --help` and the subsections below for more information and options
+6. Back to seed creation step.
+  - if a seed file is given via parameters, it loads using a lambda iterating on `vg::Alignment`, it feels the map `seedHits`
+  - this appears to be also feasible via a GAF file via `loadGafSeeds()`  
+  - then it instanciates a `Seeder seeder` object to which is potentially attach our potentially just computed memseeder or minimizerseeder.
+  - depending on `seeder.mode` it will use MUM, MEM or minimizers.
+7. Then comes the alignments and output creation
 
-#### Test example
 
-The command above outputs the following alignment in `test/aln.gaf`:
+## Alignments
 
-`read	71	0	71	+	>1>2>4	87	3	73	67	72	60	NM:i:5	AS:f:56.3	dv:f:0.0694444	id:f:0.930556	cg:Z:4=1X2=1I38=1D5=1I5=1X13=`
-
-which aligned the read to the nodes 1,2,4 with an identity of 93%. See [GAF format](https://github.com/lh3/gfatools/blob/master/doc/rGFA.md#the-graph-alignment-format-gaf) for more information about the output format. Alternatively try `-a aln.gam` for output compatible with [vg](https://github.com/vgteam/vg/).
-
-The parameter `-x vg` uses a parameter preset for aligning reads to a variation graph. Other options are `-x dbg` for aligning to a de Bruijn graph.
-
-#### File formats
-
-GraphAligner's file formats are interoperable with [vg](https://github.com/vgteam/vg/)'s file formats. Graphs can be inputed either in [.gfa format](https://github.com/GFA-spec/GFA-spec) or [.vg format](https://github.com/vgteam/libvgio/blob/master/deps/vg.proto). Reads are inputed as .fasta or .fastq, either gzipped or uncompressed. Alignments are outputed in [GAF format](https://github.com/lh3/gfatools/blob/master/doc/rGFA.md#the-graph-alignment-format-gaf) or [vg's alignment format](https://github.com/vgteam/libvgio/blob/master/deps/vg.proto), either as a binary .gam or JSON depending on the file name. Custom seeds can be inputed in [.gam format](https://github.com/vgteam/libvgio/blob/master/deps/vg.proto).
-
-#### Seed hits
-
-GraphAligner has three built-in methods for finding seed hits: minimizers (default), maximal unique matches (MUMs) and maximal exact matches (MEMs). Only matches entirely within a node are found. Minimizers (default) are faster and MUM/MEMs can be more sensitive. MUM/MEM modes use [MEMfinder](https://github.com/maickrau/MEMfinder) to find matches between the read and nodes. Use the parameter `--seeds-mum-count n` to use the `n` longest MUMs as seeds (or -1 for all MUMs), and `--seeds-mem-count n` for the `n` longest MEMs (or -1 for all MEMs). Use `--seeds-mxm-length n` to only use matches at least `n` characters long. If you are aligning multiple files to the same graph, use `--seeds-mxm-cache-prefix file_name_prefix` to store the MUM/MEM index to disk for reuse instead of rebuilding it each time.
-
-Alternatively you can use any method to find seed hits and then import the seeds in [.gam format](https://github.com/vgteam/libvgio/blob/master/deps/vg.proto) with the parameter `-s seedfile.gam`. The seeds must be passed as an alignment message, with `path.mapping[0].position` describing the position in the graph, `name` the name of the read and `query_position` the position in the forward strand of the read. Match length (`path.mapping[0].edit[0].from_length`) is only used to order the seeds, with longer matches tried before shorter matches.
-
-Alternatively you can use the parameter `--seeds-first-full-rows` to use the dynamic programming alignment algorithm on the entire first row instead of using seeded alignment. This is very slow except on tiny graphs, and not recommended.
-
-#### Extension
-
-GraphAligner uses a bitvector banded DP alignment algorithm to extend the seed hits. The DP matrix is calculated inside a certain area (the band), which depends on the extension parameters. Note that "bandwidth" in graph alignment does NOT directly correspond to bandwidth in linear alignment. The bandwidth parameter describes the maximum allowed score difference between the minimum score in a row and a cell, with cells whose score is higher than that falling outside the band. Bandwidth higher than 35 is not recommended for complex graphs due to huge increases in runtime but might work for variation graphs.
-
-The algorithm starts using the initial bandwidth. Should it detect that the alignment is incorrect, it will rewind and rerun with the ramp bandwidth parameter, aligning high-error parts of the read without slowing down alignment in low-error parts. The tangle effort parameter determines how much time GraphAligner spends inside complex cyclic subgraphs. If the size of the band grows beyond the tangle effort parameter, GraphAligner will use the current best alignment for the aligned prefix and move forward along the read. This might miss the optimal alignment.
-
-### Parameters
-
-- `-g` input graph. Format .gfa / .vg
-- `-f` input reads. Format .fasta / .fastq / .fasta.gz / .fastq.gz. You can input multiple files with `-f file1 -f file2 ...` or `-f file1 file2 ...`
-- `-t` number of aligner threads. The program also uses two IO threads in addition to these.
-- `-a` output file name. Format .gam or .json
-- `-x` parameter preset. Use `-x vg` for aligning to variation graphs and other simple graphs, and `-x dbg` for aligning to de Bruijn graphs.
-
-All parameters below are optional.
-
-- `--precise-clipping` use arg as the identity threshold for a valid alignment. Recommended to be less than the accuracy of the reads, for example 0.75 for ONT, 0.9 for HiFi, 0.95 for assembly-to-assembly.
-- `--min-alignment-score` discard alignments whose score is less than this.
-- `--multimap-score-fraction` alignment score fraction for including secondary alignments. Alignments whose alignment score is less than arg as a fraction of the best scoring overlapping alignment per read are discarded. Lower values include more poor secondary alignments and higher values less.
-
-Seeding:
-
-- `--seeds-minimizer-density` For a read of length `n`, use the `arg * n` most unique seeds
-- `--seeds-minimizer-length` k-mer size for minimizer seeds
-- `--seeds-minimizer-windowsize` Window size for minimizer seeds
-- `--seeds-mum-count` MUM seeds. Use the n longest maximal unique matches. -1 for all MUMs
-- `--seeds-mem-count` MEM seeds. Use the n longest maximal exact matches. -1 for all MEMs
-- `--seeds-mxm-length` MUM/MEM minimum length. Don't use MUMs/MEMs shorter than n
-- `--seeds-mxm-cache-prefix` MUM/MEM file cache prefix. Store the MUM/MEM index into disk for reuse. Recommended unless you are sure you won't align to the same graph multiple times
-
-Extension:
-
-- `-b` alignment bandwidth. Unlike in linear alignment, this is the score difference between the minimum score in a row and the score where a cell falls out of the band. Values recommended to be between 1-35.
-- `-C` tangle effort. Determines how much effort GraphAligner spends on tangled areas. Higher values use more CPU and memory and have a higher chance of aligning through tangles. Lower values are faster but might return an inoptimal or a partial alignment. Use for complex graphs (eg. de Bruijn graphs of mammalian genomes) to limit the runtime in difficult areas. Values recommended to be between 1'000 - 500'000.
+- Looking at ``
+- It is multithreaded
+- There are output conumer depending on output format, for as many classes.
+  - fastqThread
+  - GAMwriterThread 
+  - GAFwriterThread 
+  - JSONwriterThread 
+  - correctedWriterThread 
+  - correctedClippedWriterThread
+- the main running Component for mapping is `runComponentMappings()`
+  - there lies the while loop that ierates on sequences
+  - if seeder.mode!=None, query seeds are generated via this line:
+    `std::vector<SeedHit> seeds = seeder.getSeeds(fastq->seq_id, fastq->sequence);`
+  - this returns a `std::vector<SeedHit> seeds`
+  - `SeedHit` defined in `GraphAlignerWrapper.h`, this is a general container to get:
+    ```C++
+    int nodeID;
+    size_t nodeOffset;
+    size_t seqPos;
+    size_t matchLen;
+    bool reverse;
+    size_t rawSeedGoodness;  #<== not sure what is that
+    ```
+  - `Seeder.getSeeds()` calls to one of the registered seeder, for instance:
+    ```C++
+    case Mode::Minimizer:
+      assert(minimizerSeeder != nullptr);
+      return minimizerSeeder->getSeeds(seq, minimizerSeedDensity);
+    ```
+  - In this function, after a callback to `iterateKmers()`
+  - It seems we call a similar mer coding and hashing
+    
