@@ -147,7 +147,18 @@ std::unordered_map<std::string, std::vector<SeedHit>> seedHits;
 There are many ways to inject our genome index:
 
 - via a file as intended in GraphAligner (GAF or VG-formatted seeds)
+  - So the roadmap for file input approach is:
+  - se X-mer library to find seed matches between graph and query
+  - output them in GAF format (will need to match file format expectation on graphaligner side)
+  - load the GAF in GraphAligner and do the alignement
 
 - programatically, by extending class `Seeder` with a new method (e.g. strobemers). We just need :
-  1. on query side to get the equivalent to the already implemented : `std::vector<SeedHit> seeds = seeder.getSeeds(fastq->seq_id, fastq->sequence);`
-  2. on index side, to reuse the GFA loading function and build the index
+  1. to get an equivalent to the already implemented : `std::vector<SeedHit> seeds = seeder.getSeeds(fastq->seq_id, fastq->sequence);`
+  2. when submitting a sequence to it, the function must compute the k-mer hashes and retrieve if there is a hash match in any data structure when k-mer hashes are expected. This match must be associated to a node_id and en offest in this node. We will need to use the same node_id system as in GraphAligner, but because it gives all the necessary functions to load a GFA, this is not a problem.
+
+  - So the roadmap for programmatic approach is:
+    - use the GraphAligner code to load GFA and get sequences of each node consecutively.
+    - apply X-mers approach to this sequence to get the corresponding (hash,node_id,offset)
+    -  store them in any Hashmap data structure
+    - implement a new seeder.getSeeds() to find matches of query mers in this structure, fill SeedHit objects accordingly.
+    - pass the vector<SeedHit> to the following steps of GraphAligner (alignments).
