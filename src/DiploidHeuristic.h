@@ -4,7 +4,7 @@
 #include <vector>
 #include <tuple>
 #include <cstddef>
-#include <phmap.h>
+#include <parallel_hashmap/phmap.h>
 #include <fstream>
 #include "AlignmentGraph.h"
 

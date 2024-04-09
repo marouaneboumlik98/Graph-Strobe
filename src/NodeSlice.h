@@ -5,7 +5,7 @@
 #include <limits>
 #include <vector>
 #include <type_traits>
-#include <phmap.h>
+#include <parallel_hashmap/phmap.h>
 #include "AlignmentGraph.h"
 #include "ThreadReadAssertion.h"
 #include "WordSlice.h"

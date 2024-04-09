@@ -7,7 +7,7 @@
 #include <tuple>
 #include <unordered_set>
 #include <set>
-#include <phmap.h>
+#include <parallel_hashmap/phmap.h>
 #include "RankBitvector.h"
 #include "ThreadReadAssertion.h"
 #include "DNAString.h"
