@@ -5,7 +5,6 @@ CPPFLAGS=-Wall -Wextra -std=c++17 -O3 -g -Iconcurrentqueue -IBBHash -Izstr/src -
 ODIR=obj
 BINDIR=bin
 SRCDIR=src
-
 LIBS=-lm -lz -lboost_program_options `pkg-config --libs protobuf` -lsdsl
 JEMALLOCFLAGS= -L`jemalloc-config --libdir` -Wl,-rpath,`jemalloc-config --libdir` -Wl,-Bstatic -ljemalloc -Wl,-Bdynamic `jemalloc-config --libs`
 
