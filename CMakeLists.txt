@@ -13,7 +13,7 @@ project(GraphAligner
 #target_compile_features(GraphAligner PRIVATE cxx_std_17)
 #add_compile_options(-Wall -Wextra -O3 -g -Wno-unused-parameter)
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -Wno-unused-parameter")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -Wno-unused-parameter -DVERSION=1.0")
 
 # If you set any CMAKE_ variables, that can go here.
 # (But usually don't do this, except maybe for C++ standard)
@@ -26,7 +26,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -Wno-unused-parameter"
 # Including header files here helps IDEs but is not required.
 # Output libname matches target name, with the usual extensions on your system
 
-
+#taken from git
 include(FetchContent)
 FetchContent_Declare(
         sdsl-lite
@@ -35,27 +35,30 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(sdsl-lite)
 
+
 #libraries with cmake config
 add_subdirectory(zstr)
-#add_subdirectory(libvgio)
+add_subdirectory(concurrentqueue)
 add_subdirectory(parallel-hashmap)
 
 #search packages sur system
-find_package(Boost COMPONENTS program_options REQUIRED)
+set(Boost_USE_STATIC_LIBS  ON)
+find_package(Boost 1.70 COMPONENTS program_options REQUIRED)
+set(ZLIB_USE_STATIC_LIBS ON)
 find_package(ZLIB REQUIRED)
+set(PkgConfig_USE_STATIC_LIBS ON)
 find_package(PkgConfig REQUIRED)
 
 include(FindPkgConfig)
 pkg_check_modules(JEMALLOC REQUIRED jemalloc)
 pkg_check_modules(SPARSEHASH REQUIRED libsparsehash)
-#pkg_check_modules(SDSL REQUIRED sdsl)
 
 # protobuf
+set(Protobuf_USE_STATIC_LIBS   ON)
 find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-#add_library(proto-objects OBJECT "${CMAKE_CURRENT_LIST_DIR}/src/vg.proto")
-#protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS src/vg.proto) # compilation
+
 
 #target_sources(
 #        bbhash
@@ -65,15 +68,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 #        ${CMAKE_CURRENT_SOURCE_DIR}/BBHash/ParallelBB.h
 #)
 #set_target_properties(bbhash PROPERTIES LINKER_LANGUAGE CXX)
-
-#target_sources(
-#        concurrentqueue
-#        PRIVATE
-#        ${CMAKE_CURRENT_SOURCE_DIR}/concurrentqueue/blockingconcurrentqueue.h
-#        ${CMAKE_CURRENT_SOURCE_DIR}/concurrentqueue/concurrentqueue.h
-#        #${CMAKE_CURRENT_SOURCE_DIR}/concurrentqueue/internal/concurrentqueue_internal_debug.h
-#)
-#set_target_properties(concurrentqueue PROPERTIES LINKER_LANGUAGE CXX)
 
 
 # C library lisais, used by MEMfinder
@@ -92,7 +86,7 @@ add_library(
         MEMfinder/PartSortBWT/src/PartSortBWT.cpp
 
 )
-set_target_properties(PartSortBWT PROPERTIES LINKER_LANGUAGE C)
+set_target_properties(PartSortBWT PROPERTIES LINKER_LANGUAGE CXX)
 
 
 # MEMfinder library
@@ -144,10 +138,12 @@ protobuf_generate(
         PROTOC_OUT_DIR "${PROTO_BINARY_DIR}"
 )
 
+
 # Adding something we can run - the executable graphaligner
 add_executable(
         graphaligner
         src/Aligner.cpp
+        src/AlignerMain.cpp
         src/AlignmentGraph.cpp
         src/AlignmentSelection.cpp
         src/BigraphToDigraph.cpp
@@ -171,8 +167,6 @@ target_include_directories(
         PUBLIC
         #bbhash
         ${CMAKE_CURRENT_SOURCE_DIR}/BBHash
-        #concurrentqueue
-        ${CMAKE_CURRENT_SOURCE_DIR}/concurrentqueue
         #MEMfinder
         ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/src
         ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder
@@ -191,9 +185,9 @@ target_link_libraries(
         proto-objects
         sdsl
         MEMfinder
+        concurrentqueue
         Boost::program_options
         ZLIB::ZLIB
-        #PkgConfig::PkgConfig
         ${JEMALLOC_LIBRARIES}
         ${SPARSEHASH_LIBRARIES}
 
