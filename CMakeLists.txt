@@ -2,7 +2,7 @@
 # You should always specify a range with the newest
 # and oldest tested versions of CMake. This will ensure
 # you pick up the best policies.
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.2)
 
 # This is your project statement. You should always list languages;
 # Listing the version is nice here since it sets lots of useful variables
@@ -26,82 +26,108 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -g -Wno-unused-paramet
 # Including header files here helps IDEs but is not required.
 # Output libname matches target name, with the usual extensions on your system
 
+
+include(FetchContent)
+FetchContent_Declare(
+        sdsl-lite
+        GIT_REPOSITORY https://github.com/simongog/sdsl-lite.git
+        GIT_TAG        v2.1.1 # adjust tag/branch/commit as needed
+)
+FetchContent_MakeAvailable(sdsl-lite)
+
 #libraries with cmake config
 add_subdirectory(zstr)
 #add_subdirectory(libvgio)
 add_subdirectory(parallel-hashmap)
 
-#search pacjkages sur system
+#search packages sur system
 find_package(Boost COMPONENTS program_options REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(PkgConfig REQUIRED)
 
+include(FindPkgConfig)
 pkg_check_modules(JEMALLOC REQUIRED jemalloc)
 pkg_check_modules(SPARSEHASH REQUIRED libsparsehash)
+#pkg_check_modules(SDSL REQUIRED sdsl)
 
 # protobuf
 find_package(Protobuf REQUIRED)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-#protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS foo.proto) # compilation
+#add_library(proto-objects OBJECT "${CMAKE_CURRENT_LIST_DIR}/src/vg.proto")
+#protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS src/vg.proto) # compilation
 
-add_library(
-        BBHash
-        BBHash/BooPHF.h
-        BBHash/MinimalHashmap.h
-        BBHash/ParallelBB.h
-)
-set_target_properties(BBHash PROPERTIES LINKER_LANGUAGE CXX)
+#target_sources(
+#        bbhash
+#        PRIVATE
+#        ${CMAKE_CURRENT_SOURCE_DIR}/BBHash/BooPHF.h
+#        ${CMAKE_CURRENT_SOURCE_DIR}/BBHash/MinimalHashmap.h
+#        ${CMAKE_CURRENT_SOURCE_DIR}/BBHash/ParallelBB.h
+#)
+#set_target_properties(bbhash PROPERTIES LINKER_LANGUAGE CXX)
 
-add_library(
-        concurrentqueue
-        concurrentqueue/blockingconcurrentqueue.h
-        concurrentqueue/concurrentqueue.h
-        concurrentqueue/internal/concurrentqueue_internal_debug.h
-)
-set_target_properties(concurrentqueue PROPERTIES LINKER_LANGUAGE CXX)
+#target_sources(
+#        concurrentqueue
+#        PRIVATE
+#        ${CMAKE_CURRENT_SOURCE_DIR}/concurrentqueue/blockingconcurrentqueue.h
+#        ${CMAKE_CURRENT_SOURCE_DIR}/concurrentqueue/concurrentqueue.h
+#        #${CMAKE_CURRENT_SOURCE_DIR}/concurrentqueue/internal/concurrentqueue_internal_debug.h
+#)
+#set_target_properties(concurrentqueue PROPERTIES LINKER_LANGUAGE CXX)
 
+
+#
+
+# MEMfinder library
 add_library(
         MEMfinder
-        MEMfinder/src/FlatRanks.h
-        MEMfinder/src/FMIndex.h
-        MEMfinder/src/MEMfinder.h
-        MEMfinder/src/RankBitvector.h
-        MEMfinder/src/ReverseComplementView.h
-        MEMfinder/src/Serialize.h
-        MEMfinder/src/WaveletTree.h
-        MEMfinder/PartSortBWT/src/PartSortBWT.h
-        MEMfinder/libsais/src/libsais.h
-        MEMfinder/libsais/src/libsais16.h
-        MEMfinder/libsais/src/libsais64.h
+        STATIC
+        MEMfinder/src/FlatRanks.cpp
+        MEMfinder/src/FMIndex.cpp
+        MEMfinder/src/MEMfinder.cpp
+        MEMfinder/src/RankBitvector.cpp
+        MEMfinder/src/ReverseComplementView.cpp
+        MEMfinder/src/Serialize.cpp
+        MEMfinder/src/WaveletTree.cpp
+        MEMfinder/PartSortBWT/src/PartSortBWT.cpp
+#        MEMfinder/libsais/src/libsais.c
+#        MEMfinder/libsais/src/libsais16.c
+#        MEMfinder/libsais/src/libsais64.c
+        MEMfinder/src/RankBitvector.cpp
 )
+#target_include_directories(${PROJECT_NAME}
+#        PRIVATE
+#        # where the library itself will look for its internal headers
+#        ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/src
+#        PUBLIC
+#        # where top-level project will look for the library's public headers
+#        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/include>
+#        # where external projects will look for the library's public headers
+#        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+#)
 set_target_properties(MEMfinder PROPERTIES LINKER_LANGUAGE CXX)
 
-#add_library(
-#        parallel-hashmap
-#        parallel-hashmap/parallel_hashmap/btree.h
-#        parallel-hashmap/parallel_hashmap/meminfo.h
-#        parallel-hashmap/parallel_hashmap/phmap.h
-#        parallel-hashmap/parallel_hashmap/phmap_base.h
-#        parallel-hashmap/parallel_hashmap/phmap_bits.h
-#        parallel-hashmap/parallel_hashmap/phmap_config.h
-#        parallel-hashmap/parallel_hashmap/phmap_dump.h
-#        parallel-hashmap/parallel_hashmap/phmap_fwd_decl.h
-#        parallel-hashmap/parallel_hashmap/phmap_utils.h
-#)
-#set_target_properties(parallel-hashmap PROPERTIES LINKER_LANGUAGE CXX)
 
-#add_library(
-#        zstr
-#        ./zstr/src/zstr_make_unique_polyfill.h
-#        ./zstr/src/zstr.hpp
-#        ./zstr/src/strict_fstream.hpp
-#)
-#set_target_properties(zstr PROPERTIES LINKER_LANGUAGE CXX)
+# create library protobuf locally using vg.proto
+add_library(
+        proto-objects
+        OBJECT
+        "${CMAKE_CURRENT_LIST_DIR}/src/vg.proto"
+)
+target_link_libraries(
+        proto-objects
+        PUBLIC
+        protobuf::libprotobuf
+)
+set(PROTO_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf_generated")
+target_include_directories(proto-objects PUBLIC "$<BUILD_INTERFACE:${PROTO_BINARY_DIR}>")
+protobuf_generate(
+        TARGET proto-objects
+        IMPORT_DIRS "${CMAKE_CURRENT_LIST_DIR}/src"
+        PROTOC_OUT_DIR "${PROTO_BINARY_DIR}"
+)
 
-# Link each target with other targets or add options, etc.
-
-# Adding something we can run - Output name matches target name
+# Adding something we can run - the executable graphaligner
 add_executable(
         graphaligner
         src/Aligner.cpp
@@ -122,6 +148,21 @@ add_executable(
         #src/vg.pb.cc
 )
 
+#include_directories(${parallel-hashmap_SOURCE_DIR})
+
+target_include_directories(
+        graphaligner
+        PUBLIC
+        #bbhash
+        ${CMAKE_CURRENT_SOURCE_DIR}/BBHash
+        #concurrentqueue
+        ${CMAKE_CURRENT_SOURCE_DIR}/concurrentqueue
+        #MEMfinder
+        ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder
+)
+
+
 # Make sure you link your targets with this command. It can also link libraries and
 # even flags, so linking a target that does not exist will not give a configure-time error.
 
@@ -130,19 +171,21 @@ target_link_libraries(
         graphaligner
         PRIVATE
         zstr
-        parallel-hashmap
+        phmap
+        proto-objects
+        sdsl
         MEMfinder
-        concurrentqueue
-        BBHash
+        #concurrentqueue
+        #bbhash
         PUBLIC
-        #${PROTO_SRCS} ${PROTO_HDRS}
         Boost::program_options
         ZLIB::ZLIB
         #PkgConfig::PkgConfig
-        #${JEMALLOC_INCLUDE_DIRS}
-        #${SPARSEHASH_INCLUDE_DIRS}
+        ${JEMALLOC_LIBRARIES}
+        ${SPARSEHASH_LIBRARIES}
 
 )
+
 
 
 
