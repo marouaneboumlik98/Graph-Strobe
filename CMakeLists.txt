@@ -8,12 +8,12 @@ cmake_minimum_required(VERSION 3.2)
 # Listing the version is nice here since it sets lots of useful variables
 project(GraphAligner
         VERSION 1.0
-        LANGUAGES CXX)
+        LANGUAGES CXX C)
 
 #target_compile_features(GraphAligner PRIVATE cxx_std_17)
 #add_compile_options(-Wall -Wextra -O3 -g -Wno-unused-parameter)
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -g -Wno-unused-parameter")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -Wno-unused-parameter")
 
 # If you set any CMAKE_ variables, that can go here.
 # (But usually don't do this, except maybe for C++ standard)
@@ -76,7 +76,24 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 #set_target_properties(concurrentqueue PROPERTIES LINKER_LANGUAGE CXX)
 
 
-#
+# C library lisais, used by MEMfinder
+add_library(
+        sais
+        STATIC
+        MEMfinder/libsais/src/libsais.c
+        MEMfinder/libsais/src/libsais64.c
+)
+set_target_properties(sais PROPERTIES LINKER_LANGUAGE C)
+
+# C++ library PartSortBWT, used by MEMfinder
+add_library(
+        PartSortBWT
+        STATIC
+        MEMfinder/PartSortBWT/src/PartSortBWT.cpp
+
+)
+set_target_properties(PartSortBWT PROPERTIES LINKER_LANGUAGE C)
+
 
 # MEMfinder library
 add_library(
@@ -89,22 +106,22 @@ add_library(
         MEMfinder/src/ReverseComplementView.cpp
         MEMfinder/src/Serialize.cpp
         MEMfinder/src/WaveletTree.cpp
-        MEMfinder/PartSortBWT/src/PartSortBWT.cpp
-#        MEMfinder/libsais/src/libsais.c
-#        MEMfinder/libsais/src/libsais16.c
-#        MEMfinder/libsais/src/libsais64.c
         MEMfinder/src/RankBitvector.cpp
 )
-#target_include_directories(${PROJECT_NAME}
-#        PRIVATE
-#        # where the library itself will look for its internal headers
-#        ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/src
-#        PUBLIC
-#        # where top-level project will look for the library's public headers
-#        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/include>
-#        # where external projects will look for the library's public headers
-#        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-#)
+target_link_libraries(
+        MEMfinder
+        PRIVATE
+        sais
+        PartSortBWT
+)
+target_include_directories(
+        MEMfinder
+        PUBLIC
+        #sais
+        ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/libsais/src
+        #PartSortBWT
+        ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/PartSortBWT/src
+)
 set_target_properties(MEMfinder PROPERTIES LINKER_LANGUAGE CXX)
 
 
@@ -145,7 +162,6 @@ add_executable(
         src/MinimizerSeeder.cpp
         src/ReadCorrection.cpp
         src/ThreadReadAssertion.cpp
-        #src/vg.pb.cc
 )
 
 #include_directories(${parallel-hashmap_SOURCE_DIR})
@@ -175,9 +191,6 @@ target_link_libraries(
         proto-objects
         sdsl
         MEMfinder
-        #concurrentqueue
-        #bbhash
-        PUBLIC
         Boost::program_options
         ZLIB::ZLIB
         #PkgConfig::PkgConfig
