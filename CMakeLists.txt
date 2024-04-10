@@ -2,7 +2,7 @@
 # You should always specify a range with the newest
 # and oldest tested versions of CMake. This will ensure
 # you pick up the best policies.
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.4)
 
 # This is your project statement. You should always list languages;
 project(GraphAligner
@@ -24,29 +24,51 @@ message(CMAKE_CURRENT_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 
 
 # libraries retrieved via git
+##########################################################################
 include(FetchContent)
+
+# sdsl
 FetchContent_Declare(
         sdsl-lite
         GIT_REPOSITORY https://github.com/simongog/sdsl-lite.git
         GIT_TAG        v2.1.1 # adjust tag/branch/commit as needed
 )
-FetchContent_MakeAvailable(sdsl-lite)
+
+# marouane-modified strobemer
+# requires that ssh access is configured properly
+FetchContent_Declare(
+        strobemer
+        GIT_REPOSITORY https://github.com/blinard-BIOINFO/strobemers.git
+        GIT_TAG        cb04d8bc137de845abf35110372c18525eec0cd4
+        SOURCE_SUBDIR  strobemers_cpp
+        OVERRIDE_FIND_PACKAGE
+)
+
+FetchContent_MakeAvailable(sdsl-lite strobemer)
 
 
 # libraries directly loaded via their cmakefiles
+##########################################################################
+
 add_subdirectory(zstr)
 add_subdirectory(concurrentqueue)
 add_subdirectory(parallel-hashmap)
 
-# packages search on system
+
+# packages searched on system
+##########################################################################
+
 set(Boost_USE_STATIC_LIBS  ON)
 find_package(Boost 1.70 COMPONENTS program_options REQUIRED)
 set(ZLIB_USE_STATIC_LIBS ON)
 find_package(ZLIB REQUIRED)
 set(PkgConfig_USE_STATIC_LIBS ON)
 find_package(PkgConfig REQUIRED)
+set(strobemer_USE_STATIC_LIBS ON)
+find_package(strobemer REQUIRED)
 
 # modules
+##########################################################################
 include(FindPkgConfig)
 pkg_check_modules(JEMALLOC REQUIRED jemalloc)
 pkg_check_modules(SPARSEHASH REQUIRED libsparsehash)
@@ -59,6 +81,12 @@ pkg_check_modules(SPARSEHASH REQUIRED libsparsehash)
 #        ${CMAKE_CURRENT_SOURCE_DIR}/BBHash/ParallelBB.h
 #)
 #set_target_properties(bbhash PROPERTIES LINKER_LANGUAGE CXX)
+
+##########################################################################
+##########################################################################
+
+# library targets
+##########################################################################
 
 
 # C library lisais, used by MEMfinder
@@ -112,7 +140,8 @@ set_target_properties(MEMfinder PROPERTIES LINKER_LANGUAGE CXX)
 
 # create vg protobuh headers locally: e.g. vg.pb.cc and vg.pb.h
 # this uses "protoc" compiler
-###################################################################
+##########################################################################
+
 # search for protobug install
 set(Protobuf_USE_STATIC_LIBS   ON)
 find_package(Protobuf REQUIRED)
@@ -138,8 +167,8 @@ protobuf_generate(
         PROTOC_OUT_DIR "${PROTO_BINARY_DIR}"
 )
 
-####################################################################
-####################################################################
+##########################################################################
+##########################################################################
 
 # the executable graphaligner
 add_executable(
@@ -176,7 +205,7 @@ target_include_directories(
 
 target_link_libraries(
         graphaligner
-        PRIVATE
+        PUBLIC
         zstr
         phmap
         proto-objects
@@ -190,6 +219,56 @@ target_link_libraries(
 
 )
 
+
+# the executable graphaligner_strobe
+add_executable(
+        graphaligner_strobe
+        src/Aligner.cpp
+        src/AlignerMain.cpp
+        src/AlignmentGraph.cpp
+        src/AlignmentSelection.cpp
+        src/BigraphToDigraph.cpp
+        src/CommonUtils.cpp
+        src/DiploidHeuristic.cpp
+        src/DNAString.cpp
+        src/EValue.cpp
+        src/fastqloader.cpp
+        src/GfaGraph.cpp
+        src/GraphAlignerWrapper.cpp
+        src/MEMSeeder.cpp
+        src/MinimizerSeeder.cpp
+        src/ReadCorrection.cpp
+        src/ThreadReadAssertion.cpp
+)
+
+target_include_directories(
+        graphaligner_strobe
+        PUBLIC
+        #bbhash
+        ${CMAKE_CURRENT_SOURCE_DIR}/BBHash
+        #MEMfinder
+        ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/src
+        #proto-generated headers
+        ${PROTO_BINARY_DIR}/src
+        #
+)
+
+target_link_libraries(
+        graphaligner_strobe
+        PUBLIC
+        strobemer
+        zstr
+        phmap
+        proto-objects
+        sdsl
+        MEMfinder
+        concurrentqueue
+        Boost::program_options
+        ZLIB::ZLIB
+        ${JEMALLOC_LIBRARIES}
+        ${SPARSEHASH_LIBRARIES}
+
+)
 
 
 
