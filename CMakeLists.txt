@@ -41,7 +41,7 @@ add_subdirectory(zstr)
 add_subdirectory(concurrentqueue)
 add_subdirectory(parallel-hashmap)
 
-#search packages sur system
+#search packages on system
 set(Boost_USE_STATIC_LIBS  ON)
 find_package(Boost 1.70 COMPONENTS program_options REQUIRED)
 set(ZLIB_USE_STATIC_LIBS ON)
@@ -49,16 +49,10 @@ find_package(ZLIB REQUIRED)
 set(PkgConfig_USE_STATIC_LIBS ON)
 find_package(PkgConfig REQUIRED)
 
+#modules
 include(FindPkgConfig)
 pkg_check_modules(JEMALLOC REQUIRED jemalloc)
 pkg_check_modules(SPARSEHASH REQUIRED libsparsehash)
-
-# protobuf
-set(Protobuf_USE_STATIC_LIBS   ON)
-find_package(Protobuf REQUIRED)
-include_directories(${Protobuf_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
 
 #target_sources(
 #        bbhash
@@ -119,7 +113,13 @@ target_include_directories(
 set_target_properties(MEMfinder PROPERTIES LINKER_LANGUAGE CXX)
 
 
-# create library protobuf locally using vg.proto
+# create library protobuf locally using vg.proto to output vg.pb.cc and vg.pb.h
+# search for protobug install
+set(Protobuf_USE_STATIC_LIBS   ON)
+find_package(Protobuf REQUIRED)
+include_directories(${Protobuf_INCLUDE_DIRS})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+# create library from vg.proto
 add_library(
         proto-objects
         OBJECT
@@ -132,11 +132,17 @@ target_link_libraries(
 )
 set(PROTO_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf_generated")
 target_include_directories(proto-objects PUBLIC "$<BUILD_INTERFACE:${PROTO_BINARY_DIR}>")
+# protoc compilation
 protobuf_generate(
         TARGET proto-objects
         IMPORT_DIRS "${CMAKE_CURRENT_LIST_DIR}/src"
         PROTOC_OUT_DIR "${PROTO_BINARY_DIR}"
 )
+
+
+message(PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+message(CMAKE_CURRENT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
+message(CMAKE_CURRENT_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 
 
 # Adding something we can run - the executable graphaligner
@@ -169,7 +175,9 @@ target_include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/BBHash
         #MEMfinder
         ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder
+        #proto-generated
+        ${PROTO_BINARY_DIR}/src
+
 )
 
 
