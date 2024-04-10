@@ -5,13 +5,11 @@
 cmake_minimum_required(VERSION 3.2)
 
 # This is your project statement. You should always list languages;
-# Listing the version is nice here since it sets lots of useful variables
 project(GraphAligner
         VERSION 1.0
         LANGUAGES CXX C)
 
-#target_compile_features(GraphAligner PRIVATE cxx_std_17)
-#add_compile_options(-Wall -Wextra -O3 -g -Wno-unused-parameter)
+# compile options
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -Wno-unused-parameter -DVERSION=1.0")
 
@@ -19,14 +17,13 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O3 -Wno-unused-parameter 
 # (But usually don't do this, except maybe for C++ standard)
 # Find packages go here.
 
-# You should usually split this into folders, but this is a simple example
+# information
+message(PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+message(CMAKE_CURRENT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
+message(CMAKE_CURRENT_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 
-# This is a "default" library, and will match the *** variable setting.
-# Other common choices are STATIC, SHARED, and MODULE
-# Including header files here helps IDEs but is not required.
-# Output libname matches target name, with the usual extensions on your system
 
-#taken from git
+# libraries retrieved via git
 include(FetchContent)
 FetchContent_Declare(
         sdsl-lite
@@ -36,12 +33,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(sdsl-lite)
 
 
-#libraries with cmake config
+# libraries directly loaded via their cmakefiles
 add_subdirectory(zstr)
 add_subdirectory(concurrentqueue)
 add_subdirectory(parallel-hashmap)
 
-#search packages on system
+# packages search on system
 set(Boost_USE_STATIC_LIBS  ON)
 find_package(Boost 1.70 COMPONENTS program_options REQUIRED)
 set(ZLIB_USE_STATIC_LIBS ON)
@@ -49,7 +46,7 @@ find_package(ZLIB REQUIRED)
 set(PkgConfig_USE_STATIC_LIBS ON)
 find_package(PkgConfig REQUIRED)
 
-#modules
+# modules
 include(FindPkgConfig)
 pkg_check_modules(JEMALLOC REQUIRED jemalloc)
 pkg_check_modules(SPARSEHASH REQUIRED libsparsehash)
@@ -71,7 +68,7 @@ add_library(
         MEMfinder/libsais/src/libsais.c
         MEMfinder/libsais/src/libsais64.c
 )
-set_target_properties(sais PROPERTIES LINKER_LANGUAGE C)
+set_target_properties(sais PROPERTIES LINKER_LANGUAGE C)  # !!! C not C++
 
 # C++ library PartSortBWT, used by MEMfinder
 add_library(
@@ -113,7 +110,9 @@ target_include_directories(
 set_target_properties(MEMfinder PROPERTIES LINKER_LANGUAGE CXX)
 
 
-# create library protobuf locally using vg.proto to output vg.pb.cc and vg.pb.h
+# create vg protobuh headers locally: e.g. vg.pb.cc and vg.pb.h
+# this uses "protoc" compiler
+###################################################################
 # search for protobug install
 set(Protobuf_USE_STATIC_LIBS   ON)
 find_package(Protobuf REQUIRED)
@@ -139,13 +138,10 @@ protobuf_generate(
         PROTOC_OUT_DIR "${PROTO_BINARY_DIR}"
 )
 
+####################################################################
+####################################################################
 
-message(PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
-message(CMAKE_CURRENT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/")
-message(CMAKE_CURRENT_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
-
-
-# Adding something we can run - the executable graphaligner
+# the executable graphaligner
 add_executable(
         graphaligner
         src/Aligner.cpp
@@ -166,8 +162,6 @@ add_executable(
         src/ThreadReadAssertion.cpp
 )
 
-#include_directories(${parallel-hashmap_SOURCE_DIR})
-
 target_include_directories(
         graphaligner
         PUBLIC
@@ -175,16 +169,11 @@ target_include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/BBHash
         #MEMfinder
         ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/src
-        #proto-generated
+        #proto-generated headers
         ${PROTO_BINARY_DIR}/src
 
 )
 
-
-# Make sure you link your targets with this command. It can also link libraries and
-# even flags, so linking a target that does not exist will not give a configure-time error.
-
-#link my local static librarires
 target_link_libraries(
         graphaligner
         PRIVATE
