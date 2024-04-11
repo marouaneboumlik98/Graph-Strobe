@@ -901,9 +901,45 @@ void alignReads(AlignerParams params)
 		}
 		seedHitsToThreads = &seedHits;
 	}
+
+    // strobemer: we can probably do the same as below,
+    //            we need to generate a std::unordered_map<std::basic_string<char>, std::vector<SeedHit>>
+    //    * the map has a string as key and a vector of SeedHit as value
+    //    * we will need to verify where this string come from : node id ?
+    //    * We will need to fill SeedHit objects with strobmer mer_vectors
 	if (params.realignFile.size() > 0)
 	{
 		seedHits = loadGafSeeds(alignmentGraph, params.realignFile);
+        /**
+         * strobemer
+         * object AlignmentGraph encapsulates the graph (loaded via VG or GFA)
+         *   * TODO: check if node ids are changed/renamed compared to input graph
+         * object SeedHit is defined in GraphAlignerWrapper
+         *   * CAREFUL: there is also a SeedHit definition in AlignmentGraph !
+         *
+            class SeedHit
+            {
+            public:
+                SeedHit() :
+                nodeID(std::numeric_limits<int>::min()),
+                nodeOffset(std::numeric_limits<size_t>::max()),
+                seqPos(std::numeric_limits<size_t>::max()),
+                matchLen(std::numeric_limits<size_t>::max()),
+                reverse(false),
+                rawSeedGoodness(0)
+                {
+                }
+                int nodeID;
+                size_t nodeOffset;
+                size_t seqPos;
+                size_t matchLen;
+                bool reverse;
+                size_t rawSeedGoodness;  <<== WHAT IS THIS ? lié aux minimizers, dans le cas des MEM c'est = à matchLen
+            };
+
+         *   Il exist aussi un "ProcessedSeedHit", mais il ne semble pas utilisé dans le code
+
+         */
 		seedHitsToThreads = &seedHits;
 	}
 
@@ -911,6 +947,31 @@ void alignReads(AlignerParams params)
 
 	switch(seeder.mode)
 	{
+        /**
+         * strobemer: looking at Seeder object, as soon as a fileSeeds is given to it,
+         * it will switch to Seeder::Mode::File, see Seeder code below
+
+          Seeder(
+            const AlignerParams& params,
+            const std::unordered_map<
+               std::string,
+               std::vector<SeedHit>>* fileSeeds,
+               const MEMSeeder* memSeeder,
+               const MinimizerSeeder* minimizerSeeder
+          ) :
+          fileSeeds(fileSeeds)
+          {
+		    mode = Mode::None;
+		    if (fileSeeds != nullptr)
+		    {
+                assert(minimizerSeeder == nullptr);
+                assert(memSeeder == nullptr);
+                assert(mumCount == 0);
+                assert(memCount == 0);
+                assert(minimizerSeedDensity == 0);
+                mode = Mode::File;
+		    }
+         */
 		case Seeder::Mode::File:
 			std::cout << "Seeds from file" << std::endl;
 			break;
