@@ -2,7 +2,7 @@
 # You should always specify a range with the newest
 # and oldest tested versions of CMake. This will ensure
 # you pick up the best policies.
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.2)
 
 # This is your project statement. You should always list languages;
 project(GraphAligner
@@ -60,10 +60,13 @@ add_subdirectory(parallel-hashmap)
 
 set(Boost_USE_STATIC_LIBS  ON)
 find_package(Boost 1.70 COMPONENTS program_options REQUIRED)
+
 set(ZLIB_USE_STATIC_LIBS ON)
 find_package(ZLIB REQUIRED)
+
 set(PkgConfig_USE_STATIC_LIBS ON)
 find_package(PkgConfig REQUIRED)
+
 set(strobemer_USE_STATIC_LIBS ON)
 find_package(strobemer REQUIRED)
 
@@ -88,6 +91,36 @@ pkg_check_modules(SPARSEHASH REQUIRED libsparsehash)
 # library targets
 ##########################################################################
 
+
+# create vg protobuf headers locally: e.g. vg.pb.cc and vg.pb.h
+# this uses "protoc" compiler
+##########################################################################
+
+# search for protobug install
+set(Protobuf_USE_STATIC_LIBS ON)
+find_package(Protobuf REQUIRED)
+#include_directories(${Protobuf_INCLUDE_DIRS})
+#include_directories(${CMAKE_CURRENT_BINARY_DIR})
+# create library from vg.proto
+add_library(
+        proto-objects
+        OBJECT
+        "${CMAKE_CURRENT_LIST_DIR}/src/vg.proto"
+)
+target_link_libraries(
+        proto-objects
+        PUBLIC
+        protobuf::libprotobuf
+)
+set(PROTO_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf_generated")
+file(MAKE_DIRECTORY ${PROTO_BINARY_DIR})  #for some reason this is necessary in some setups
+target_include_directories(proto-objects PUBLIC "$<BUILD_INTERFACE:${PROTO_BINARY_DIR}>")
+# protoc compilation
+protobuf_generate(
+        TARGET proto-objects
+        IMPORT_DIRS "${CMAKE_CURRENT_LIST_DIR}/src"
+        PROTOC_OUT_DIR "${PROTO_BINARY_DIR}"
+)
 
 # C library lisais, used by MEMfinder
 add_library(
@@ -136,36 +169,6 @@ target_include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/MEMfinder/PartSortBWT/src
 )
 set_target_properties(MEMfinder PROPERTIES LINKER_LANGUAGE CXX)
-
-
-# create vg protobuh headers locally: e.g. vg.pb.cc and vg.pb.h
-# this uses "protoc" compiler
-##########################################################################
-
-# search for protobug install
-set(Protobuf_USE_STATIC_LIBS   ON)
-find_package(Protobuf REQUIRED)
-include_directories(${Protobuf_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-# create library from vg.proto
-add_library(
-        proto-objects
-        OBJECT
-        "${CMAKE_CURRENT_LIST_DIR}/src/vg.proto"
-)
-target_link_libraries(
-        proto-objects
-        PUBLIC
-        protobuf::libprotobuf
-)
-set(PROTO_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf_generated")
-target_include_directories(proto-objects PUBLIC "$<BUILD_INTERFACE:${PROTO_BINARY_DIR}>")
-# protoc compilation
-protobuf_generate(
-        TARGET proto-objects
-        IMPORT_DIRS "${CMAKE_CURRENT_LIST_DIR}/src"
-        PROTOC_OUT_DIR "${PROTO_BINARY_DIR}"
-)
 
 ##########################################################################
 ##########################################################################
