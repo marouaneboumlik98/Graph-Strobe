@@ -13,8 +13,8 @@ int main(int argc, char** argv)
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-	std::cout << "GraphAligner (strobemer hack POC)" << VERSION << std::endl;
-	std::cerr << "GraphAligner (strobemer hack POC)" << VERSION << std::endl;
+	std::cout << "GraphAligner (strobemer hack POC) " << VERSION << std::endl;
+	std::cerr << "GraphAligner (strobemer hack POC) " << VERSION << std::endl;
 
 #ifndef NOBUILTINPOPCOUNT
 	if (__builtin_cpu_supports("popcnt") == 0)

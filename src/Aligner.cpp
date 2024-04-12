@@ -19,6 +19,7 @@
 #include "MinimizerSeeder.h"
 #include "AlignmentSelection.h"
 #include "DiploidHeuristic.h"
+#include "_deps/strobemer-src/strobemers_cpp/index.hpp"
 
 struct Seeder
 {
@@ -529,6 +530,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, const DiploidHeu
 					continue;
 				}
 				auto clusterTimeStart = std::chrono::system_clock::now();
+                // DANS ClusterSeeds, les nodeid du Seeder sont convertis en bigraph_nodeid
 				auto processedSeeds = ClusterSeeds(alignmentGraph, seeds, params.seedClusterMinSize);
 				if (processedSeeds.size() > params.maxClusterExtend)
 				{
@@ -909,7 +911,61 @@ void alignReads(AlignerParams params)
     //    * We will need to fill SeedHit objects with strobmer mer_vectors
 	if (params.realignFile.size() > 0)
 	{
-		seedHits = loadGafSeeds(alignmentGraph, params.realignFile);
+        std::cout << "Load seeds from strobemer library" << std::endl;
+        //seedHits = loadGafSeeds(alignmentGraph, params.realignFile);
+
+        // commands to pass from internal to GFA IDs
+        // do not used before ClusterSeed() => ProcessedSeed  (ids doublés)
+        std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeID(42) << std::endl;
+        std::cout << "BigraphNodeName " << alignmentGraph.BigraphNodeName(42) << std::endl;
+        std::cout << "BigraphNodeSeq " << alignmentGraph.BigraphNodeSeq(42) << std::endl;
+
+
+        // import ok : seq_to_randstrobes2();
+
+        //Parametres de la commande pour test
+
+        //MEDIUM_read.fasta
+        //>read_0
+        //ATAGCGCGATATCGAGCGCTAATAAACCCGAAAGCCTAGCCGAATCGCGAATAG
+
+        //graph is
+
+        /**
+            --graph
+            /home/belinard/MIAT/STAGIAIRES/GRAPH_DATASETS/MEDIUM_small_graph_10kb.gfa
+            --reads
+            /home/belinard/MIAT/STAGIAIRES/GRAPH_DATASETS/MEDIUM_read.fasta
+            --alignments-out
+            /home/belinard/MIAT/SOURCES/CLionProjects/GraphAligner/test.json
+            --realign                                     <<== active mode seeds dans fichier (GAFAlignement)
+            dummy_file_to_enter_strobemer_mode
+            --seeds-minimizer-density                     <<== desactive les minimizers
+            0
+            --max-cluster-extend                          <<== --preset vg : repris les valeurs
+            5
+            --bandwidth                                   <<== --preset vg : repris les valeurs
+            10
+            --verbose
+        **/
+
+
+        //SeedHit(int nodeID, size_t nodeOffset, size_t seqPos, size_t matchLen, size_t rawSeedGoodness, bool reverse)
+        seedHits["read_0"].emplace_back(22, 10, 2, 19, 19, false);
+        seedHits["read_0"].emplace_back(22, 11, 3, 19, 19, false);
+        seedHits["read_0"].emplace_back(22, 12, 4, 19, 19, false);
+        seedHits["read_0"].emplace_back(22, 15, 7, 19, 19, false);
+        seedHits["read_0"].emplace_back(22, 18, 9, 19, 19, false);
+
+        seedHits["read_0"].emplace_back(22, 10, 12, 19, 19, false);
+
+        seedHits["read_0"].emplace_back(22, 25, 16, 19, 19, false);
+        seedHits["read_0"].emplace_back(22, 28, 19, 19, 19, false);
+        seedHits["read_0"].emplace_back(22, 30, 21, 19, 19, false);
+
+
+
+
         /**
          * strobemer
          * object AlignmentGraph encapsulates the graph (loaded via VG or GFA)
