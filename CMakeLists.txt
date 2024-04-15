@@ -39,7 +39,7 @@ FetchContent_Declare(
 FetchContent_Declare(
         strobemer
         GIT_REPOSITORY https://github.com/blinard-BIOINFO/strobemers.git
-        GIT_TAG        cb04d8bc137de845abf35110372c18525eec0cd4
+        GIT_TAG        e22fa4691bbb071e31f812b1c3caea307b756d0e
         SOURCE_SUBDIR  strobemers_cpp
         OVERRIDE_FIND_PACKAGE
 )
