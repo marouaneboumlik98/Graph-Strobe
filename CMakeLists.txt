@@ -192,6 +192,7 @@ add_executable(
         src/MinimizerSeeder.cpp
         src/ReadCorrection.cpp
         src/ThreadReadAssertion.cpp
+        cmake-build-debug/_deps/strobemer-src/strobemers_cpp/nam.cpp
 )
 
 target_include_directories(

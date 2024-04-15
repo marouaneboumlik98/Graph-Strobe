@@ -19,7 +19,9 @@
 #include "MinimizerSeeder.h"
 #include "AlignmentSelection.h"
 #include "DiploidHeuristic.h"
-#include "_deps/strobemer-src/strobemers_cpp/index.hpp"
+#include "../cmake-build-debug/_deps/strobemer-src/strobemers_cpp/index.hpp"
+#include "../cmake-build-debug/_deps/strobemer-src/strobemers_cpp/nam.hpp"
+
 
 struct Seeder
 {
@@ -909,7 +911,8 @@ void alignReads(AlignerParams params)
     //    * the map has a string as key and a vector of SeedHit as value
     //    * we will need to verify where this string come from : node id ?
     //    * We will need to fill SeedHit objects with strobmer mer_vectors
-	if (params.realignFile.size() > 0)
+
+    if (params.realignFile.size() > 0)
 	{
         std::cout << "Load seeds from strobemer library" << std::endl;
         //seedHits = loadGafSeeds(alignmentGraph, params.realignFile);
