@@ -974,22 +974,6 @@ void alignReads(AlignerParams params)
 
 //STROBEMER POUR SEQUENCE FW
 
-        mers_vector query_mers;
-
-        // Traitement des reads FASTQ
-        FastQ::streamFastqFromFile(params.realignFile, true, [&](FastQ read) {
-            mers_vector mers = seq_to_minstrobes2(2, 10, 11, 15, read.sequence, std::stoi(read.seq_id));
-            query_mers.insert(query_mers.end(), mers.begin(), mers.end());
-        });
-
-        // Imprimer les résultats pour vérification
-        for (const auto& item : query_mers) {
-            std::cout << "Hash: " << std::get<0>(item)
-                      << ", SeqID: " << std::get<1>(item)
-                      << ", Pos1: " << std::get<2>(item)
-                      << ", Pos2: " << std::get<3>(item)
-                      << ", Pos3: " << std::get<4>(item) << std::endl;
-        }
 
 
 
