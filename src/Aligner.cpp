@@ -171,7 +171,7 @@ void replaceDigraphNodeIdsWithOriginalNodeIds(vg::Alignment& alignment, const Al
 		}
 	}
 }
-
+//LES LECTURES PAR ICI
 void readFastqs(const std::vector<std::string>& filenames, moodycamel::ConcurrentQueue<std::shared_ptr<FastQ>>& writequeue, std::atomic<bool>& readStreamingFinished)
 {
 	assertSetNoRead("Read streamer");
@@ -192,6 +192,27 @@ void readFastqs(const std::vector<std::string>& filenames, moodycamel::Concurren
 		});
 	}
 	readStreamingFinished = true;
+
+    //PRINT READS
+//    for (auto filename : filenames) {
+//        FastQ::streamFastqFromFile(filename, false, [&writequeue](FastQ& read) {
+//            std::shared_ptr<FastQ> ptr = std::make_shared<FastQ>();
+//            std::swap(*ptr, read);
+//
+//            // Imprimer les détails de la lecture
+//            std::cout << "Read ID: " << ptr->seq_id << std::endl;
+//            std::cout << "Read Sequence: " << ptr->sequence << std::endl;
+//            std::cout << "Read Quality: " << ptr->quality << std::endl;
+//
+//            size_t slept = 0;
+//            while (writequeue.size_approx() > 200) {
+//                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+//                slept++;
+//                if (slept > 100) break;
+//            }
+//            writequeue.enqueue(ptr);
+//        });
+//    }
 }
 
 void consumeBytesAndWrite(const std::string& filename, moodycamel::ConcurrentQueue<std::string*>& writequeue, moodycamel::ConcurrentQueue<std::string*>& deallocqueue, std::atomic<bool>& allThreadsDone, std::atomic<bool>& allWriteDone, bool verboseMode, bool textMode)
@@ -799,6 +820,8 @@ std::unordered_map<std::string, std::vector<SeedHit>> loadGafSeeds(const Alignme
 	return result;
 }
 
+
+
 void alignReads(AlignerParams params)
 {
 	assertSetNoRead("Preprocessing");
@@ -915,14 +938,83 @@ void alignReads(AlignerParams params)
     if (params.realignFile.size() > 0)
 	{
         std::cout << "Load seeds from strobemer library" << std::endl;
+
+//        std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeCount() << std::endl;
+//        for (size_t i = 0; i < alignmentGraph.BigraphNodeCount(); i += 2 ) {
+//            std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeID(i) << std::endl;
+//            std::cout << "BigraphNodeName " << alignmentGraph.BigraphNodeName(i) << std::endl;
+//            std::cout << "BigraphNodeSeq " << alignmentGraph.BigraphNodeSeq(i) << std::endl;
+//        }
+
+
+
+//STROBEMER pour GRAPH / REF
+
+            mers_vector all_mers;
+
+            for (size_t i = 0; i < alignmentGraph.BigraphNodeCount(); i += 2) {
+                //size_t bigraphNodeId = alignmentGraph.BigraphNodeID(i);
+                std::string nodeName = alignmentGraph.BigraphNodeName(i);
+                std::string nodeSeq = alignmentGraph.BigraphNodeSeq(i);
+
+                mers_vector mers = seq_to_minstrobes2(2, 10, 11, 15, nodeSeq, stoi(nodeName));
+
+                all_mers.insert(all_mers.end(), mers.begin(), mers.end());
+            }
+//            int count = 0;
+//            for (const auto& item : all_mers) {
+//                count++;
+//            std::cout << "Hash: " << std::get<0>(item)
+//                      << ", RefIndex: " << std::get<1>(item)
+//                      << ", SeqPos1: " << std::get<2>(item)
+//                      << ", SeqPos2: " << std::get<3>(item)
+//                      << ", SeqPos3: " << std::get<4>(item) << std::endl;
+//            }
+//        std::cout << "count " << count << std::endl;
+
+//STROBEMER POUR SEQUENCE FW
+
+        mers_vector query_mers;
+
+        // Traitement des reads FASTQ
+        FastQ::streamFastqFromFile(params.realignFile, true, [&](FastQ read) {
+            mers_vector mers = seq_to_minstrobes2(2, 10, 11, 15, read.sequence, std::stoi(read.seq_id));
+            query_mers.insert(query_mers.end(), mers.begin(), mers.end());
+        });
+
+        // Imprimer les résultats pour vérification
+        for (const auto& item : query_mers) {
+            std::cout << "Hash: " << std::get<0>(item)
+                      << ", SeqID: " << std::get<1>(item)
+                      << ", Pos1: " << std::get<2>(item)
+                      << ", Pos2: " << std::get<3>(item)
+                      << ", Pos3: " << std::get<4>(item) << std::endl;
+        }
+
+
+
         //seedHits = loadGafSeeds(alignmentGraph, params.realignFile);
 
         // commands to pass from internal to GFA IDs
         // do not used before ClusterSeed() => ProcessedSeed  (ids doublés)
-        std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeID(42) << std::endl;
-        std::cout << "BigraphNodeName " << alignmentGraph.BigraphNodeName(42) << std::endl;
-        std::cout << "BigraphNodeSeq " << alignmentGraph.BigraphNodeSeq(42) << std::endl;
-
+//        std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeID(42) << std::endl;
+//        std::cout << "BigraphNodeName " << alignmentGraph.BigraphNodeName(42) << std::endl;
+//        std::cout << "BigraphNodeSeq " << alignmentGraph.BigraphNodeSeq(42) << std::endl;
+//
+//        //les reads
+//        for i in alignmentGraph.BigraphNodeCount():
+//            intern = alignmentGraph.BigraphNodeID(42)
+//            original = alignmentGraph.BigraphNodeName(42)
+//
+//            auto seq = alignmentGraph.BigraphNodeSeq(42) ;
+//
+//
+//            mers_vector forward = seq_to_minstrobes2(2,5,6,6,seq,original);
+//        //check des hash identifiques dans les 2 struct
+//
+//        //conversion du match en SeedHit
+//            for match in all_match:
+//                seedHits["read_0"].emplace_back(mer.ref_index, 10, 2, 19, 19, false);
 
         // import ok : seq_to_randstrobes2();
 
