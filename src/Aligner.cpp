@@ -972,10 +972,88 @@ void alignReads(AlignerParams params)
 //            }
 //        std::cout << "count " << count << std::endl;
 
-//STROBEMER POUR SEQUENCE FW
+//STROBEMER POUR SEQUENCE FW & RC
+       mers_vector query_mers;
+       mers_vector query_mers_rc;
+       std::vector<std::string> readNames;
+        int cpt=0;
+        std::vector<std::string> filenames = {params.fastqFiles};
+        for (const auto& filename : filenames) {
+            FastQ::streamFastqFromFile(filename, true, [&query_mers, &query_mers_rc ,  &cpt, &readNames](FastQ& read) { //N'OUBLIE PAS D'AJOUTER &query_mers_rc POUR REVERSE
+                std::string rev_complement_seq = reverse_complement(read.sequence);
+                mers_vector mers = seq_to_minstrobes2(2, 10, 11, 15, read.sequence, cpt);
+                query_mers.insert(query_mers.end(), mers.begin(), mers.end());
+                mers_vector mers_rc = seq_to_minstrobes2(2, 10, 11, 15, rev_complement_seq, cpt);
+                query_mers_rc.insert(query_mers_rc.end(), mers_rc.begin(), mers_rc.end());
+                readNames.push_back(read.seq_id);
+                cpt++;
+            });
+        }
+//        for (const auto& name : readNames) {
+//            std::cout << "Read Name: " << name << std::endl;
+//        }
+
+//        int cmt=0;
+//        for (const auto& item : query_mers) {
+//            cmt++;
+//            std::cout << "Hash: " << std::get<0>(item)
+//                      << ", SeqID: " << std::get<1>(item)
+//                      << ", Pos1: " << std::get<2>(item)
+//                      << ", Pos2: " << std::get<3>(item)
+//                      << ", Pos3: " << std::get<4>(item) << std::endl;
+//        }
+//        std::cout << "count " << cmt << std::endl;
 
 
+// HASH COMMUN ENTRE LES STRUCTURES
 
+//        std::vector<SeedHit> seedHits;
+        typedef robin_hood::unordered_map<unsigned int, std::vector<hit>> hit_map;
+        int k=10;
+        hit_map hits_per_ref;
+        uint64_t match_commun = 0;
+        uint64_t total_mers = 0;
+
+        for (const auto& q : query_mers) {
+            uint64_t mer_hashv = std::get<0>(q);
+            unsigned int ref_index = std::get<1>(q);
+            for (const auto& a : all_mers) {
+                if (mer_hashv == std::get<0>(a)) {
+                    hit h;
+                    h.query_s = std::get<2>(q);
+                    h.query_e = std::get<4>(q)+ k;
+                    h.ref_s = std::get<2>(a);
+                    h.ref_e = std::get<4>(a)+ k;
+
+                    unsigned int ref_id = std::get<1>(a);
+                    std::string read_name = readNames[ref_index];
+                    hits_per_ref[ref_id].push_back(h);
+                    match_commun++;
+
+                    seedHits[read_name].emplace_back(ref_id, h.ref_s, h.query_s, h.query_e - h.query_s, h.query_e - h.query_s , false);
+                }
+            }
+            total_mers++;
+        }
+
+        std::cout << "Total mers processed: " << total_mers << std::endl;
+        std::cout << "Total hits found: " << match_commun << std::endl;
+
+        for (const auto& pair : seedHits) {
+            const std::string& readName = pair.first;
+            const std::vector<SeedHit>& hits = pair.second;
+
+            std::cout << "Read Name: " << readName << " has " << hits.size() << " SeedHits:" << std::endl;
+            for (const SeedHit& hit : hits) {
+                std::cout << "    Node ID: " << hit.nodeID
+                          << ", Node Offset: " << hit.nodeOffset
+                          << ", Sequence Position: " << hit.seqPos
+                          << ", Match Length: " << hit.matchLen
+                          << ", Seed Goodness: " << hit.rawSeedGoodness
+                          << ", Reverse: " << hit.reverse << std::endl;
+
+            }
+        }
 
         //seedHits = loadGafSeeds(alignmentGraph, params.realignFile);
 
@@ -1030,17 +1108,17 @@ void alignReads(AlignerParams params)
 
 
         //SeedHit(int nodeID, size_t nodeOffset, size_t seqPos, size_t matchLen, size_t rawSeedGoodness, bool reverse)
-        seedHits["read_0"].emplace_back(22, 10, 2, 19, 19, false);
-        seedHits["read_0"].emplace_back(22, 11, 3, 19, 19, false);
-        seedHits["read_0"].emplace_back(22, 12, 4, 19, 19, false);
-        seedHits["read_0"].emplace_back(22, 15, 7, 19, 19, false);
-        seedHits["read_0"].emplace_back(22, 18, 9, 19, 19, false);
-
-        seedHits["read_0"].emplace_back(22, 10, 12, 19, 19, false);
-
-        seedHits["read_0"].emplace_back(22, 25, 16, 19, 19, false);
-        seedHits["read_0"].emplace_back(22, 28, 19, 19, 19, false);
-        seedHits["read_0"].emplace_back(22, 30, 21, 19, 19, false);
+//        seedHits["read_0"].emplace_back(22, 10, 2, 19, 19, false);
+//        seedHits["read_0"].emplace_back(22, 11, 3, 19, 19, false);
+//        seedHits["read_0"].emplace_back(22, 12, 4, 19, 19, false);
+//        seedHits["read_0"].emplace_back(22, 15, 7, 19, 19, false);
+//        seedHits["read_0"].emplace_back(22, 18, 9, 19, 19, false);
+//
+//        seedHits["read_0"].emplace_back(22, 10, 12, 19, 19, false);
+//
+//        seedHits["read_0"].emplace_back(22, 25, 16, 19, 19, false);
+//        seedHits["read_0"].emplace_back(22, 28, 19, 19, 19, false);
+//        seedHits["read_0"].emplace_back(22, 30, 21, 19, 19, false);
 
 
 
