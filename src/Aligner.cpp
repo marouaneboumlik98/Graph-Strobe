@@ -929,18 +929,12 @@ void alignReads(AlignerParams params)
 		seedHitsToThreads = &seedHits;
 	}
 
-    // strobemer: we can probably do the same as below,
-    //            we need to generate a std::unordered_map<std::basic_string<char>, std::vector<SeedHit>>
-    //    * the map has a string as key and a vector of SeedHit as value
-    //    * we will need to verify where this string come from : node id ?
-    //    * We will need to fill SeedHit objects with strobmer mer_vectors
-
     if (params.realignFile.size() > 0)
 	{
         std::cout << "Load seeds from strobemer library" << std::endl;
 
 //        std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeCount() << std::endl;
-//        for (size_t i = 0; i < alignmentGraph.BigraphNodeCount(); i += 2 ) {
+//        for (size_t i = 0; i < alignmentGraph.BigraphNodeCount(); i++ ) {
 //            std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeID(i) << std::endl;
 //            std::cout << "BigraphNodeName " << alignmentGraph.BigraphNodeName(i) << std::endl;
 //            std::cout << "BigraphNodeSeq " << alignmentGraph.BigraphNodeSeq(i) << std::endl;
@@ -950,22 +944,27 @@ void alignReads(AlignerParams params)
 
 //STROBEMER pour GRAPH / REF
 
-            mers_vector all_mers;
+            mers_vector allMersVector;
 
-            for (size_t i = 0; i < alignmentGraph.BigraphNodeCount(); i += 2) {
+            for (size_t i = 0; i < alignmentGraph.BigraphNodeCount()/2; i ++) {
                 //size_t bigraphNodeId = alignmentGraph.BigraphNodeID(i);
-                std::string nodeName = alignmentGraph.BigraphNodeName(i);
-                std::string nodeSeq = alignmentGraph.BigraphNodeSeq(i);
+                //std::string nodeName = alignmentGraph.BigraphNodeName(i);
+                std::string nodeSeq = alignmentGraph.BigraphNodeSeq(i*2);
+                mers_vector mers = seq_to_minstrobes2(2, 15, 16, 30, nodeSeq, i);
+                //mers_vector mers = seq_to_randstrobes2(2, 10, 11, 15, nodeSeq, i);
 
-                mers_vector mers = seq_to_minstrobes2(2, 10, 11, 15, nodeSeq, stoi(nodeName));
-
-                all_mers.insert(all_mers.end(), mers.begin(), mers.end());
+                allMersVector.insert(allMersVector.end(), mers.begin(), mers.end());
             }
+
+//        exportAllMers(allMersVector);
+
+
 //            int count = 0;
-//            for (const auto& item : all_mers) {
+//            for (const auto& item : allMersVector) {
 //                count++;
 //            std::cout << "Hash: " << std::get<0>(item)
 //                      << ", RefIndex: " << std::get<1>(item)
+//                      << ", RefName: " << alignmentGraph.BigraphNodeName(std::get<1>(item)*2 )
 //                      << ", SeqPos1: " << std::get<2>(item)
 //                      << ", SeqPos2: " << std::get<3>(item)
 //                      << ", SeqPos3: " << std::get<4>(item) << std::endl;
@@ -981,14 +980,27 @@ void alignReads(AlignerParams params)
         for (const auto& filename : filenames) {
             FastQ::streamFastqFromFile(filename, true, [&query_mers, &query_mers_rc ,  &cpt, &readNames](FastQ& read) { //N'OUBLIE PAS D'AJOUTER &query_mers_rc POUR REVERSE
                 std::string rev_complement_seq = reverse_complement(read.sequence);
-                mers_vector mers = seq_to_minstrobes2(2, 10, 11, 15, read.sequence, cpt);
+                //mers_vector mers = seq_to_randstrobes2(2, 10, 11, 15, read.sequence, cpt);
+                mers_vector mers = seq_to_minstrobes2(2, 15, 16, 30, read.sequence, cpt);
                 query_mers.insert(query_mers.end(), mers.begin(), mers.end());
-                mers_vector mers_rc = seq_to_minstrobes2(2, 10, 11, 15, rev_complement_seq, cpt);
+                //mers_vector mers_rc = seq_to_randstrobes2(2, 10, 11, 15, rev_complement_seq, cpt);
+                mers_vector mers_rc = seq_to_minstrobes2(2, 15, 16, 30, rev_complement_seq, cpt);
                 query_mers_rc.insert(query_mers_rc.end(), mers_rc.begin(), mers_rc.end());
                 readNames.push_back(read.seq_id);
                 cpt++;
             });
         }
+//        std::string filePath = "QueryMers.csv";
+//        if (fileExists(filePath)) {
+//            remove(filePath.c_str());
+//        }
+//        std::string filePath2 = "QueryMers_rc.csv";
+//        if (fileExists(filePath2)) {
+//            remove(filePath2.c_str());
+//        }
+//        exportQueryMers(query_mers);
+//        exportQueryMers_rc(query_mers_rc);
+
 //        for (const auto& name : readNames) {
 //            std::cout << "Read Name: " << name << std::endl;
 //        }
@@ -1008,151 +1020,101 @@ void alignReads(AlignerParams params)
 // HASH COMMUN ENTRE LES STRUCTURES
 
 //        std::vector<SeedHit> seedHits;
+        // refid, start, end
+        typedef std::tuple < unsigned int, unsigned int, unsigned int > interval_t;
+        typedef robin_hood::unordered_map<unsigned int, std::vector<interval_t>> mer_hash_t;
+        // transfer allMersVector to a map with the hash as key
+        mer_hash_t merHash;
+        for (const auto &a: allMersVector) {
+            merHash[std::get<0>(a)].push_back(std::make_tuple(std::get<1>(a), std::get<2>(a), std::get<4>(a)));
+        }
         typedef robin_hood::unordered_map<unsigned int, std::vector<hit>> hit_map;
         int k=10;
         hit_map hits_per_ref;
         uint64_t match_commun = 0;
         uint64_t total_mers = 0;
-
-        for (const auto& q : query_mers) {
-            uint64_t mer_hashv = std::get<0>(q);
-            unsigned int ref_index = std::get<1>(q);
-            for (const auto& a : all_mers) {
-                if (mer_hashv == std::get<0>(a)) {
+        std::vector<std::pair<mers_vector*, bool>> mers_vectors = {
+                {&query_mers, false},
+                {&query_mers_rc, true}
+        };
+        for (const auto& mers_info : mers_vectors) {
+            mers_vector *mers_vector_ptr = mers_info.first;
+            bool is_reverse_complement = mers_info.second;
+            for (const auto &q: *mers_vector_ptr) {
+                uint64_t mer_hashv = std::get<0>(q);
+                unsigned int ref_index = std::get<1>(q);
+                for (const auto &a: merHash[mer_hashv]) {
                     hit h;
                     h.query_s = std::get<2>(q);
-                    h.query_e = std::get<4>(q)+ k;
-                    h.ref_s = std::get<2>(a);
-                    h.ref_e = std::get<4>(a)+ k;
+                    h.query_e = std::get<4>(q) + k;
+                    h.ref_s = std::get<1>(a);
+                    h.ref_e = std::get<2>(a) + k;
 
-                    unsigned int ref_id = std::get<1>(a);
+                    unsigned int ref_id = std::get<0>(a);
                     std::string read_name = readNames[ref_index];
                     hits_per_ref[ref_id].push_back(h);
                     match_commun++;
 
-                    seedHits[read_name].emplace_back(ref_id, h.ref_s, h.query_s, h.query_e - h.query_s, h.query_e - h.query_s , false);
+                    seedHits[read_name].emplace_back(ref_id, h.ref_s, h.query_s, h.query_e - h.query_s,
+                                                     h.query_e - h.query_s, is_reverse_complement);
                 }
+                total_mers++;
             }
-            total_mers++;
         }
+
+
+        std::ofstream merHashFile("merHash.csv");
+        merHashFile << "HashKey,RefStart,RefEnd,SomeValue\n";
+        for (const auto& pair : merHash) {
+            unsigned int hashKey = pair.first;
+            const auto& intervals = pair.second;
+            for (const auto& interval : intervals) {
+                merHashFile << hashKey << ','
+                            << std::get<0>(interval) << ','
+                            << std::get<1>(interval) << ','
+                            << std::get<2>(interval) << '\n';
+            }
+        }
+        merHashFile.close();
+
+        std::ofstream seedHitsFile("seedHits.csv");
+        seedHitsFile << "ReadName,NodeID,NodeOffset,SeqPos,MatchLen,RawSeedGoodness,IsReverse\n";
+        for (const auto& pair : seedHits) {
+            const std::string& readName = pair.first;
+            const auto& hits = pair.second;
+            for (const auto& hit : hits) {
+                seedHitsFile << readName << ','
+                             << hit.nodeID << ','
+                             << hit.nodeOffset << ','
+                             << hit.seqPos << ','
+                             << hit.matchLen << ','
+                             << hit.rawSeedGoodness << ','
+                             << (hit.reverse ? "true" : "false") << '\n';
+            }
+        }
+        seedHitsFile.close();
+
 
         std::cout << "Total mers processed: " << total_mers << std::endl;
         std::cout << "Total hits found: " << match_commun << std::endl;
 
-        for (const auto& pair : seedHits) {
-            const std::string& readName = pair.first;
-            const std::vector<SeedHit>& hits = pair.second;
-
-            std::cout << "Read Name: " << readName << " has " << hits.size() << " SeedHits:" << std::endl;
-            for (const SeedHit& hit : hits) {
-                std::cout << "    Node ID: " << hit.nodeID
-                          << ", Node Offset: " << hit.nodeOffset
-                          << ", Sequence Position: " << hit.seqPos
-                          << ", Match Length: " << hit.matchLen
-                          << ", Seed Goodness: " << hit.rawSeedGoodness
-                          << ", Reverse: " << hit.reverse << std::endl;
-
-            }
-        }
-
-        //seedHits = loadGafSeeds(alignmentGraph, params.realignFile);
-
-        // commands to pass from internal to GFA IDs
-        // do not used before ClusterSeed() => ProcessedSeed  (ids doublés)
-//        std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeID(42) << std::endl;
-//        std::cout << "BigraphNodeName " << alignmentGraph.BigraphNodeName(42) << std::endl;
-//        std::cout << "BigraphNodeSeq " << alignmentGraph.BigraphNodeSeq(42) << std::endl;
+//        for (const auto& pair : seedHits) {
+//            const std::string& readName = pair.first;
+//            const std::vector<SeedHit>& hits = pair.second;
 //
-//        //les reads
-//        for i in alignmentGraph.BigraphNodeCount():
-//            intern = alignmentGraph.BigraphNodeID(42)
-//            original = alignmentGraph.BigraphNodeName(42)
+//            std::cout << "Read Name: " << readName << " has " << hits.size() << " SeedHits:" << std::endl;
+//            for (const SeedHit& hit : hits) {
+//                std::cout << "    Node ID: " << hit.nodeID
+//                          << ", RefName: " << alignmentGraph.BigraphNodeName(hit.nodeID*2 )
+//                          << ", Node Offset: " << hit.nodeOffset
+//                          << ", Sequence Position: " << hit.seqPos
+//                          << ", Match Length: " << hit.matchLen
+//                          << ", Seed Goodness: " << hit.rawSeedGoodness
+//                          << ", Reverse: " << hit.reverse << std::endl;
 //
-//            auto seq = alignmentGraph.BigraphNodeSeq(42) ;
-//
-//
-//            mers_vector forward = seq_to_minstrobes2(2,5,6,6,seq,original);
-//        //check des hash identifiques dans les 2 struct
-//
-//        //conversion du match en SeedHit
-//            for match in all_match:
-//                seedHits["read_0"].emplace_back(mer.ref_index, 10, 2, 19, 19, false);
+//            }
+//        }
 
-        // import ok : seq_to_randstrobes2();
-
-        //Parametres de la commande pour test
-
-        //MEDIUM_read.fasta
-        //>read_0
-        //ATAGCGCGATATCGAGCGCTAATAAACCCGAAAGCCTAGCCGAATCGCGAATAG
-
-        //graph is
-
-        /**
-            --graph
-            /home/belinard/MIAT/STAGIAIRES/GRAPH_DATASETS/MEDIUM_small_graph_10kb.gfa
-            --reads
-            /home/belinard/MIAT/STAGIAIRES/GRAPH_DATASETS/MEDIUM_read.fasta
-            --alignments-out
-            /home/belinard/MIAT/SOURCES/CLionProjects/GraphAligner/test.json
-            --realign                                     <<== active mode seeds dans fichier (GAFAlignement)
-            dummy_file_to_enter_strobemer_mode
-            --seeds-minimizer-density                     <<== desactive les minimizers
-            0
-            --max-cluster-extend                          <<== --preset vg : repris les valeurs
-            5
-            --bandwidth                                   <<== --preset vg : repris les valeurs
-            10
-            --verbose
-        **/
-
-
-        //SeedHit(int nodeID, size_t nodeOffset, size_t seqPos, size_t matchLen, size_t rawSeedGoodness, bool reverse)
-//        seedHits["read_0"].emplace_back(22, 10, 2, 19, 19, false);
-//        seedHits["read_0"].emplace_back(22, 11, 3, 19, 19, false);
-//        seedHits["read_0"].emplace_back(22, 12, 4, 19, 19, false);
-//        seedHits["read_0"].emplace_back(22, 15, 7, 19, 19, false);
-//        seedHits["read_0"].emplace_back(22, 18, 9, 19, 19, false);
-//
-//        seedHits["read_0"].emplace_back(22, 10, 12, 19, 19, false);
-//
-//        seedHits["read_0"].emplace_back(22, 25, 16, 19, 19, false);
-//        seedHits["read_0"].emplace_back(22, 28, 19, 19, 19, false);
-//        seedHits["read_0"].emplace_back(22, 30, 21, 19, 19, false);
-
-
-
-
-        /**
-         * strobemer
-         * object AlignmentGraph encapsulates the graph (loaded via VG or GFA)
-         *   * TODO: check if node ids are changed/renamed compared to input graph
-         * object SeedHit is defined in GraphAlignerWrapper
-         *   * CAREFUL: there is also a SeedHit definition in AlignmentGraph !
-         *
-            class SeedHit
-            {
-            public:
-                SeedHit() :
-                nodeID(std::numeric_limits<int>::min()),
-                nodeOffset(std::numeric_limits<size_t>::max()),
-                seqPos(std::numeric_limits<size_t>::max()),
-                matchLen(std::numeric_limits<size_t>::max()),
-                reverse(false),
-                rawSeedGoodness(0)
-                {
-                }
-                int nodeID;
-                size_t nodeOffset;
-                size_t seqPos;
-                size_t matchLen;
-                bool reverse;
-                size_t rawSeedGoodness;  <<== WHAT IS THIS ? lié aux minimizers, dans le cas des MEM c'est = à matchLen
-            };
-
-         *   Il exist aussi un "ProcessedSeedHit", mais il ne semble pas utilisé dans le code
-
-         */
 		seedHitsToThreads = &seedHits;
 	}
 
@@ -1160,31 +1122,6 @@ void alignReads(AlignerParams params)
 
 	switch(seeder.mode)
 	{
-        /**
-         * strobemer: looking at Seeder object, as soon as a fileSeeds is given to it,
-         * it will switch to Seeder::Mode::File, see Seeder code below
-
-          Seeder(
-            const AlignerParams& params,
-            const std::unordered_map<
-               std::string,
-               std::vector<SeedHit>>* fileSeeds,
-               const MEMSeeder* memSeeder,
-               const MinimizerSeeder* minimizerSeeder
-          ) :
-          fileSeeds(fileSeeds)
-          {
-		    mode = Mode::None;
-		    if (fileSeeds != nullptr)
-		    {
-                assert(minimizerSeeder == nullptr);
-                assert(memSeeder == nullptr);
-                assert(mumCount == 0);
-                assert(memCount == 0);
-                assert(minimizerSeedDensity == 0);
-                mode = Mode::File;
-		    }
-         */
 		case Seeder::Mode::File:
 			std::cout << "Seeds from file" << std::endl;
 			break;
