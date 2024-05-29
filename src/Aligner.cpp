@@ -945,18 +945,27 @@ void alignReads(AlignerParams params)
 //STROBEMER pour GRAPH / REF
 
             mers_vector allMersVector;
+            mers_vector mers_strobe;
+            mers_vector mers_strobe_rc;
 
             for (size_t i = 0; i < alignmentGraph.BigraphNodeCount()/2; i ++) {
                 //size_t bigraphNodeId = alignmentGraph.BigraphNodeID(i);
                 //std::string nodeName = alignmentGraph.BigraphNodeName(i);
                 std::string nodeSeq = alignmentGraph.BigraphNodeSeq(i*2);
-                mers_vector mers = seq_to_minstrobes2(2, 15, 16, 30, nodeSeq, i);
-                //mers_vector mers = seq_to_randstrobes2(2, 10, 11, 15, nodeSeq, i);
 
-                allMersVector.insert(allMersVector.end(), mers.begin(), mers.end());
+                //TO SHIFT MIN/RAND
+                if (params.strobemethod == "minstrobe") {
+                    std::cout << "We use Minstrobes" << std::endl;
+                    mers_strobe = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, nodeSeq, i);
+                } else {
+                    std::cout << "We use Randstrobes" << std::endl;
+                    mers_strobe = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, nodeSeq, i);
+                }
+
+                allMersVector.insert(allMersVector.end(), mers_strobe.begin(), mers_strobe.end());
             }
 
-//        exportAllMers(allMersVector);
+        //exportAllMers(allMersVector);
 
 
 //            int count = 0;
@@ -978,14 +987,22 @@ void alignReads(AlignerParams params)
         int cpt=0;
         std::vector<std::string> filenames = {params.fastqFiles};
         for (const auto& filename : filenames) {
-            FastQ::streamFastqFromFile(filename, true, [&query_mers, &query_mers_rc ,  &cpt, &readNames](FastQ& read) { //N'OUBLIE PAS D'AJOUTER &query_mers_rc POUR REVERSE
+            FastQ::streamFastqFromFile(filename, true,
+                                       [&params, &mers_strobe, &query_mers, &query_mers_rc , &cpt, &readNames, &mers_strobe_rc](FastQ& read) { //N'OUBLIE PAS D'AJOUTER &query_mers_rc POUR REVERSE
                 std::string rev_complement_seq = reverse_complement(read.sequence);
-                //mers_vector mers = seq_to_randstrobes2(2, 10, 11, 15, read.sequence, cpt);
-                mers_vector mers = seq_to_minstrobes2(2, 15, 16, 30, read.sequence, cpt);
-                query_mers.insert(query_mers.end(), mers.begin(), mers.end());
-                //mers_vector mers_rc = seq_to_randstrobes2(2, 10, 11, 15, rev_complement_seq, cpt);
-                mers_vector mers_rc = seq_to_minstrobes2(2, 15, 16, 30, rev_complement_seq, cpt);
-                query_mers_rc.insert(query_mers_rc.end(), mers_rc.begin(), mers_rc.end());
+
+                if(params.strobemethod=="minstrobe"){
+                    std::cout << "We use Minstrobes" << std::endl;
+                    mers_strobe = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, read.sequence, cpt);
+                    mers_vector mers_rc = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, rev_complement_seq, cpt);
+
+                } else {
+                    std::cout << "We use Randstrobes" << std::endl;
+                    mers_strobe = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, read.sequence, cpt);
+                    mers_strobe_rc = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, rev_complement_seq, cpt);
+                }
+                query_mers.insert(query_mers.end(), mers_strobe.begin(), mers_strobe.end());
+                query_mers_rc.insert(query_mers_rc.end(), mers_strobe_rc.begin(), mers_strobe_rc.end());
                 readNames.push_back(read.seq_id);
                 cpt++;
             });
