@@ -55,6 +55,13 @@ struct AlignerParams
 	std::vector<size_t> diploidHeuristicK;
 	std::string diploidHeuristicCacheFile;
 	bool keepSequenceNameTags;
+
+    // my params for strobemers
+    std::string strobemethod; // minstrobe / randstrobe
+    int strobe_n;
+    int strobe_k;
+    int strobe_v;
+    int strobe_w;
 };
 
 void alignReads(AlignerParams params);

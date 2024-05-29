@@ -96,9 +96,17 @@ int main(int argc, char** argv)
 		("diploid-heuristic", boost::program_options::value<std::vector<size_t>>()->multitoken(), "align to a diploid graph using haplotype aware heuristics using listed k-mer sizes (ints)")
 		("diploid-heuristic-cache", boost::program_options::value<std::string>(), "cache file for haplotype aware heuristic")
 	;
+    boost::program_options::options_description strobemer("Strobes parameters");
+    strobemer.add_options()
+            ("strobemethod,c", boost::program_options::value<std::string>(), "input method (minstrobe / randstrobe)")
+            ("strobe_n,n", boost::program_options::value<int>(), "number of strobes : randstrobe (2/3) minstrobe :(2) ")
+            ("strobe_k,k", boost::program_options::value<int>(), "length of one strobe")
+            ("strobe_v,v", boost::program_options::value<int>(), "position of window min")
+            ("strobe_w,w", boost::program_options::value<int>(), "position of window max")
+            ;
 
 	boost::program_options::options_description cmdline_options;
-	cmdline_options.add(mandatory).add(general).add(seeding).add(alignment).add(hidden).add(presets);
+	cmdline_options.add(mandatory).add(general).add(seeding).add(alignment).add(hidden).add(presets).add(strobemer);
 
 	boost::program_options::variables_map vm;
 	try
@@ -115,7 +123,7 @@ int main(int argc, char** argv)
 
 	if (vm.count("help"))
 	{
-		std::cerr << mandatory << std::endl << general << std::endl << seeding << std::endl << alignment << std::endl;
+		std::cerr << mandatory << std::endl << general << std::endl << seeding << std::endl << alignment << std::endl << strobemer <<std::endl;
 		std::cerr << presets << std::endl;
 		std::exit(0);
 	}
@@ -169,6 +177,9 @@ int main(int argc, char** argv)
 	params.useDiploidHeuristic = false;
 	params.diploidHeuristicCacheFile = "";
 	params.keepSequenceNameTags = false;
+
+    // my default params for strobmers
+    params.strobemethod = false; // minstrobe
 
 	std::vector<std::string> outputAlns;
 	bool paramError = false;
@@ -242,6 +253,17 @@ int main(int argc, char** argv)
 	if (vm.count("unique-mem-bonus-factor")) params.uniqueMemBonusFactor = vm["unique-mem-bonus-factor"].as<double>();
 	if (vm.count("low-memory-mem-index-construction")) params.lowMemoryMEMIndexConstruction = true;
 	if (vm.count("mem-index-no-wavelet-tree")) params.MEMindexUsesWaveletTree = false;
+
+    // strobemers parameters
+    if (vm.count("strobemethod")) params.strobemethod = vm["strobemethod"].as<std::string>();
+    if (vm.count("strobe_n")) params.strobe_n = vm["strobe_n"].as<int>();
+    if (vm.count("strobe_k")) params.strobe_k = vm["strobe_k"].as<int>();
+    if (vm.count("strobe_v")) params.strobe_v = vm["strobe_v"].as<int>();
+    if (vm.count("strobe_w")) params.strobe_w = vm["strobe_w"].as<int>();
+
+
+    //end strobemer parameters
+
 	if (vm.count("diploid-heuristic-cache")) params.diploidHeuristicCacheFile = vm["diploid-heuristic-cache"].as<std::string>();
 	if (vm.count("diploid-heuristic"))
 	{
