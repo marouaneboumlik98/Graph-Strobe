@@ -46,6 +46,7 @@ public:
 	{
 		AlignmentResult result;
 		result.readName = seq_id;
+        // WARNING: REVERSE COMPLEMENT DE GRAPHALIGNER
 		std::string bwSequence = CommonUtils::ReverseComplement(sequence);
 		auto fw = fullstartOneWay(seq_id, reusableState, sequence, bwSequence, 0);
 		if (!fw.alignmentFailed()) result.alignments.emplace_back(std::move(fw));

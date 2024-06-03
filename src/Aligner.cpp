@@ -528,7 +528,7 @@ void runComponentMappings(const AlignmentGraph& alignmentGraph, const DiploidHeu
 		AlignmentResult alignments;
 
 		size_t alntimems = 0;
-		try
+		try  //WARNING: on rentre ICI !
 		{
 			if (seeder.mode != Seeder::Mode::None)
 			{
@@ -955,17 +955,15 @@ void alignReads(AlignerParams params)
 
                 //TO SHIFT MIN/RAND
                 if (params.strobemethod == "minstrobe") {
-                    std::cout << "We use Minstrobes" << std::endl;
                     mers_strobe = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, nodeSeq, i);
                 } else {
-                    std::cout << "We use Randstrobes" << std::endl;
                     mers_strobe = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, nodeSeq, i);
                 }
 
                 allMersVector.insert(allMersVector.end(), mers_strobe.begin(), mers_strobe.end());
             }
 
-        //exportAllMers(allMersVector);
+        exportAllMers(allMersVector);
 
 
 //            int count = 0;
@@ -989,15 +987,14 @@ void alignReads(AlignerParams params)
         for (const auto& filename : filenames) {
             FastQ::streamFastqFromFile(filename, true,
                                        [&params, &mers_strobe, &query_mers, &query_mers_rc , &cpt, &readNames, &mers_strobe_rc](FastQ& read) { //N'OUBLIE PAS D'AJOUTER &query_mers_rc POUR REVERSE
+                // !!!! WARNING REVERSE
                 std::string rev_complement_seq = reverse_complement(read.sequence);
 
                 if(params.strobemethod=="minstrobe"){
-                    std::cout << "We use Minstrobes" << std::endl;
                     mers_strobe = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, read.sequence, cpt);
                     mers_vector mers_rc = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, rev_complement_seq, cpt);
 
                 } else {
-                    std::cout << "We use Randstrobes" << std::endl;
                     mers_strobe = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, read.sequence, cpt);
                     mers_strobe_rc = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, rev_complement_seq, cpt);
                 }
@@ -1007,16 +1004,16 @@ void alignReads(AlignerParams params)
                 cpt++;
             });
         }
-//        std::string filePath = "QueryMers.csv";
-//        if (fileExists(filePath)) {
-//            remove(filePath.c_str());
-//        }
-//        std::string filePath2 = "QueryMers_rc.csv";
-//        if (fileExists(filePath2)) {
-//            remove(filePath2.c_str());
-//        }
-//        exportQueryMers(query_mers);
-//        exportQueryMers_rc(query_mers_rc);
+        std::string filePath = "QueryMers.csv";
+        if (fileExists(filePath)) {
+            remove(filePath.c_str());
+        }
+        std::string filePath2 = "QueryMers_rc.csv";
+        if (fileExists(filePath2)) {
+            remove(filePath2.c_str());
+        }
+        exportQueryMers(query_mers);
+        exportQueryMers_rc(query_mers_rc);
 
 //        for (const auto& name : readNames) {
 //            std::cout << "Read Name: " << name << std::endl;
@@ -1056,7 +1053,7 @@ void alignReads(AlignerParams params)
         };
         for (const auto& mers_info : mers_vectors) {
             mers_vector *mers_vector_ptr = mers_info.first;
-            bool is_reverse_complement = mers_info.second;
+            bool is_reverse_complement = mers_info.second;   // WARNING : true is forward in both ?
             for (const auto &q: *mers_vector_ptr) {
                 uint64_t mer_hashv = std::get<0>(q);
                 unsigned int ref_index = std::get<1>(q);
