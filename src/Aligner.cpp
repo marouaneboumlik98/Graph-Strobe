@@ -938,6 +938,7 @@ void alignReads(AlignerParams params)
 //            std::cout << "BigraphNodeID " << alignmentGraph.BigraphNodeID(i) << std::endl;
 //            std::cout << "BigraphNodeName " << alignmentGraph.BigraphNodeName(i) << std::endl;
 //            std::cout << "BigraphNodeSeq " << alignmentGraph.BigraphNodeSeq(i) << std::endl;
+//
 //        }
 
 
@@ -945,22 +946,26 @@ void alignReads(AlignerParams params)
 //STROBEMER pour GRAPH / REF
 
             mers_vector allMersVector;
+            mers_vector allMersVector_rc;
             mers_vector mers_strobe;
-            mers_vector mers_strobe_rc;
+            //mers_vector mers_strobe_rc;
 
-            for (size_t i = 0; i < alignmentGraph.BigraphNodeCount()/2; i ++) {
+            for (size_t i = 0; i < alignmentGraph.BigraphNodeCount(); i ++) {
                 //size_t bigraphNodeId = alignmentGraph.BigraphNodeID(i);
                 //std::string nodeName = alignmentGraph.BigraphNodeName(i);
-                std::string nodeSeq = alignmentGraph.BigraphNodeSeq(i*2);
+                std::string nodeSeq = alignmentGraph.BigraphNodeSeq(i);
 
                 //TO SHIFT MIN/RAND
                 if (params.strobemethod == "minstrobe") {
-                    mers_strobe = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, nodeSeq, i);
+                    mers_strobe = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, nodeSeq, i/2);
                 } else {
-                    mers_strobe = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, nodeSeq, i);
+                    mers_strobe = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, nodeSeq, i/2);
                 }
-
-                allMersVector.insert(allMersVector.end(), mers_strobe.begin(), mers_strobe.end());
+                if (i%2 ==0){
+                    allMersVector.insert(allMersVector.end(), mers_strobe.begin(), mers_strobe.end());
+                } else {
+                   allMersVector_rc.insert(allMersVector_rc.end(), mers_strobe.begin(), mers_strobe.end());
+                }
             }
 
         exportAllMers(allMersVector);
@@ -980,40 +985,40 @@ void alignReads(AlignerParams params)
 
 //STROBEMER POUR SEQUENCE FW & RC
        mers_vector query_mers;
-       mers_vector query_mers_rc;
+       //mers_vector query_mers_rc;
        std::vector<std::string> readNames;
         int cpt=0;
         std::vector<std::string> filenames = {params.fastqFiles};
         for (const auto& filename : filenames) {
             FastQ::streamFastqFromFile(filename, true,
-                                       [&params, &mers_strobe, &query_mers, &query_mers_rc , &cpt, &readNames, &mers_strobe_rc](FastQ& read) { //N'OUBLIE PAS D'AJOUTER &query_mers_rc POUR REVERSE
-                // !!!! WARNING REVERSE
-                std::string rev_complement_seq = reverse_complement(read.sequence);
+                                       [&params, &mers_strobe, &query_mers, &cpt, &readNames](FastQ& read) { //N'OUBLIE PAS D'AJOUTER &query_mers_rc POUR REVERSE
+
+                //std::string rev_complement_seq = reverse_complement(read.sequence);
 
                 if(params.strobemethod=="minstrobe"){
                     mers_strobe = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, read.sequence, cpt);
-                    mers_vector mers_rc = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, rev_complement_seq, cpt);
+                    //mers_vector mers_rc = seq_to_minstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, rev_complement_seq, cpt);
 
                 } else {
                     mers_strobe = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, read.sequence, cpt);
-                    mers_strobe_rc = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, rev_complement_seq, cpt);
+                    //mers_strobe_rc = seq_to_randstrobes2(params.strobe_n, params.strobe_k, params.strobe_v, params.strobe_w, rev_complement_seq, cpt);
                 }
                 query_mers.insert(query_mers.end(), mers_strobe.begin(), mers_strobe.end());
-                query_mers_rc.insert(query_mers_rc.end(), mers_strobe_rc.begin(), mers_strobe_rc.end());
+                //query_mers_rc.insert(query_mers_rc.end(), mers_strobe_rc.begin(), mers_strobe_rc.end());
                 readNames.push_back(read.seq_id);
                 cpt++;
             });
         }
-        std::string filePath = "QueryMers.csv";
-        if (fileExists(filePath)) {
-            remove(filePath.c_str());
-        }
-        std::string filePath2 = "QueryMers_rc.csv";
-        if (fileExists(filePath2)) {
-            remove(filePath2.c_str());
-        }
-        exportQueryMers(query_mers);
-        exportQueryMers_rc(query_mers_rc);
+//        std::string filePath = "QueryMers.csv";
+//        if (fileExists(filePath)) {
+//            remove(filePath.c_str());
+//        }
+//        std::string filePath2 = "QueryMers_rc.csv";
+//        if (fileExists(filePath2)) {
+//            remove(filePath2.c_str());
+//        }
+//        exportQueryMers(query_mers);
+//        //exportQueryMers_rc(query_mers_rc);
 
 //        for (const auto& name : readNames) {
 //            std::cout << "Read Name: " << name << std::endl;
@@ -1038,33 +1043,42 @@ void alignReads(AlignerParams params)
         typedef std::tuple < unsigned int, unsigned int, unsigned int > interval_t;
         typedef robin_hood::unordered_map<unsigned int, std::vector<interval_t>> mer_hash_t;
         // transfer allMersVector to a map with the hash as key
+        std::vector<std::pair<mers_vector*, bool>> mers_vectors = {
+                //{&query_mers, false},
+                {&allMersVector, false},
+                //{&query_mers_rc, true}
+                {&allMersVector_rc, true}
+        };
         mer_hash_t merHash;
-        for (const auto &a: allMersVector) {
-            merHash[std::get<0>(a)].push_back(std::make_tuple(std::get<1>(a), std::get<2>(a), std::get<4>(a)));
-        }
+
+
+
+//        for (const auto &a: allMersVector) {
+//            merHash[std::get<0>(a)].push_back(std::make_tuple(std::get<1>(a), std::get<2>(a), std::get<4>(a)));
+//        }
         typedef robin_hood::unordered_map<unsigned int, std::vector<hit>> hit_map;
-        int k=10;
+        int k= params.strobe_k;
         hit_map hits_per_ref;
         uint64_t match_commun = 0;
         uint64_t total_mers = 0;
-        std::vector<std::pair<mers_vector*, bool>> mers_vectors = {
-                {&query_mers, false},
-                {&query_mers_rc, true}
-        };
-        for (const auto& mers_info : mers_vectors) {
-            mers_vector *mers_vector_ptr = mers_info.first;
-            bool is_reverse_complement = mers_info.second;   // WARNING : true is forward in both ?
-            for (const auto &q: *mers_vector_ptr) {
+
+    for(const auto &a : mers_vectors){
+        mers_vector *mers_vector_ptr = a.first;
+        bool is_reverse_complement = a.second;
+        for (const auto & ref_mer : *mers_vector_ptr){
+            merHash[std::get<0>(ref_mer)].push_back(std::make_tuple(std::get<1>(ref_mer), std::get<2>(ref_mer), std::get<4>(ref_mer)));
+        }
+            for (const auto &q: query_mers) {
                 uint64_t mer_hashv = std::get<0>(q);
                 unsigned int ref_index = std::get<1>(q);
-                for (const auto &a: merHash[mer_hashv]) {
+                for (const auto &b: merHash[mer_hashv]) {
                     hit h;
                     h.query_s = std::get<2>(q);
                     h.query_e = std::get<4>(q) + k;
-                    h.ref_s = std::get<1>(a);
-                    h.ref_e = std::get<2>(a) + k;
+                    h.ref_s = std::get<1>(b);
+                    h.ref_e = std::get<2>(b) + k;
 
-                    unsigned int ref_id = std::get<0>(a);
+                    unsigned int ref_id = std::get<0>(b);
                     std::string read_name = readNames[ref_index];
                     hits_per_ref[ref_id].push_back(h);
                     match_commun++;
@@ -1077,36 +1091,36 @@ void alignReads(AlignerParams params)
         }
 
 
-        std::ofstream merHashFile("merHash.csv");
-        merHashFile << "HashKey,RefStart,RefEnd,SomeValue\n";
-        for (const auto& pair : merHash) {
-            unsigned int hashKey = pair.first;
-            const auto& intervals = pair.second;
-            for (const auto& interval : intervals) {
-                merHashFile << hashKey << ','
-                            << std::get<0>(interval) << ','
-                            << std::get<1>(interval) << ','
-                            << std::get<2>(interval) << '\n';
-            }
-        }
-        merHashFile.close();
-
-        std::ofstream seedHitsFile("seedHits.csv");
-        seedHitsFile << "ReadName,NodeID,NodeOffset,SeqPos,MatchLen,RawSeedGoodness,IsReverse\n";
-        for (const auto& pair : seedHits) {
-            const std::string& readName = pair.first;
-            const auto& hits = pair.second;
-            for (const auto& hit : hits) {
-                seedHitsFile << readName << ','
-                             << hit.nodeID << ','
-                             << hit.nodeOffset << ','
-                             << hit.seqPos << ','
-                             << hit.matchLen << ','
-                             << hit.rawSeedGoodness << ','
-                             << (hit.reverse ? "true" : "false") << '\n';
-            }
-        }
-        seedHitsFile.close();
+//        std::ofstream merHashFile("merHash.csv");
+//        merHashFile << "HashKey,RefStart,RefEnd,SomeValue\n";
+//        for (const auto& pair : merHash) {
+//            unsigned int hashKey = pair.first;
+//            const auto& intervals = pair.second;
+//            for (const auto& interval : intervals) {
+//                merHashFile << hashKey << ','
+//                            << std::get<0>(interval) << ','
+//                            << std::get<1>(interval) << ','
+//                            << std::get<2>(interval) << '\n';
+//            }
+//        }
+//        merHashFile.close();
+//
+//        std::ofstream seedHitsFile("seedHits.csv");
+//        seedHitsFile << "ReadName,NodeID,NodeOffset,SeqPos,MatchLen,RawSeedGoodness,IsReverse\n";
+//        for (const auto& pair : seedHits) {
+//            const std::string& readName = pair.first;
+//            const auto& hits = pair.second;
+//            for (const auto& hit : hits) {
+//                seedHitsFile << readName << ','
+//                             << hit.nodeID << ','
+//                             << hit.nodeOffset << ','
+//                             << hit.seqPos << ','
+//                             << hit.matchLen << ','
+//                             << hit.rawSeedGoodness << ','
+//                             << (hit.reverse ? "true" : "false") << '\n';
+//            }
+//        }
+//        seedHitsFile.close();
 
 
         std::cout << "Total mers processed: " << total_mers << std::endl;
