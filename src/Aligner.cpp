@@ -968,7 +968,7 @@ void alignReads(AlignerParams params)
                 }
             }
 
-        exportAllMers(allMersVector);
+       // exportAllMers(allMersVector);
 
 
 //            int count = 0;
